@@ -25,7 +25,7 @@ permissions:
 env:
   DATABASE_PATH: data/rekry_tutka.db
   SOURCES_PATH: config/sources.json
-  REPORT_PATH: reports/weekly-keyword-report.md
+  REPORT_PATH: reports/weekly-keyword-report.html
   REPORT_RECIPIENT: mirva.kataja@me.com
   INGESTION_LIMIT: ${{ github.event.inputs.ingestion_limit || '50' }}
   REKRY_TUTKA_LLM_MODEL: ${{ vars.REKRY_TUTKA_LLM_MODEL || 'gpt-4o-mini' }}
@@ -115,7 +115,8 @@ jobs:
             --database "$DATABASE_PATH" \
             --days 7 \
             --top 10 \
-            --links 3 > "$REPORT_PATH"
+            --links 3 \
+            --format html > "$REPORT_PATH"
           cat "$REPORT_PATH"
 
       - name: Email weekly keyword report
@@ -129,7 +130,7 @@ jobs:
           subject: "Rekry-tutka: viikon avainsanaraportti"
           to: ${{ env.REPORT_RECIPIENT }}
           from: ${{ secrets.SMTP_FROM || secrets.SMTP_USERNAME }}
-          body: file://${{ env.REPORT_PATH }}
+          html_body: file://${{ env.REPORT_PATH }}
 
       - name: Save updated SQLite database
         if: always()

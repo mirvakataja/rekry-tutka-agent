@@ -3,15 +3,18 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from html import escape
 import json
+from urllib.parse import quote
 
 from .db import DocumentStore
-from .models import KeywordReportRow
+from .models import KeywordReportLink, KeywordReportRow
 
 
 @dataclass(frozen=True)
 class KeywordOccurrence:
     keyword: str
+    source_name: str
     title: str
     source_url: str
     discovered_at: str
@@ -43,6 +46,7 @@ def build_weekly_keyword_report(
             occurrences[keyword].append(
                 KeywordOccurrence(
                     keyword=keyword,
+                    source_name=row["source_name"],
                     title=row["title"],
                     source_url=row["source_url"],
                     discovered_at=row["discovered_at"],
@@ -51,7 +55,14 @@ def build_weekly_keyword_report(
 
     report_rows: list[KeywordReportRow] = []
     for keyword, count in counts.most_common(top_n):
-        links = tuple(_format_markdown_link(item.title, item.source_url) for item in occurrences[keyword][:links_per_keyword])
+        links = tuple(
+            KeywordReportLink(
+                title=item.title,
+                source_url=item.source_url,
+                source_name=item.source_name,
+            )
+            for item in occurrences[keyword][:links_per_keyword]
+        )
         report_rows.append(KeywordReportRow(keyword=keyword, count=count, occurrence_links=links))
 
     return report_rows
@@ -63,13 +74,63 @@ def format_keyword_report_table(rows: list[KeywordReportRow]) -> str:
         "| --- | ---: | --- |",
     ]
     for row in rows:
-        links = "<br>".join(row.occurrence_links)
+        links = "<br>".join(_format_markdown_link(link) for link in row.occurrence_links)
         table.append(f"| {row.keyword} | {row.count} | {links} |")
 
     if len(table) == 2:
         table.append("| Ei tuloksia | 0 | |")
 
     return "\n".join(table)
+
+
+def format_keyword_report_html(rows: list[KeywordReportRow]) -> str:
+    table_rows = []
+    if rows:
+        for row in rows:
+            links = "".join(
+                f"<li>{_format_html_link(link)}</li>"
+                for link in row.occurrence_links
+            )
+            table_rows.append(
+                "<tr>"
+                f"<td>{escape(row.keyword)}</td>"
+                f"<td style=\"text-align: right;\">{row.count}</td>"
+                f"<td><ul>{links}</ul></td>"
+                "</tr>"
+            )
+    else:
+        table_rows.append("<tr><td>Ei tuloksia</td><td style=\"text-align: right;\">0</td><td></td></tr>")
+
+    return "\n".join(
+        [
+            "<!doctype html>",
+            "<html>",
+            "<head>",
+            '  <meta charset="utf-8">',
+            "  <style>",
+            "    body { font-family: Arial, sans-serif; color: #1f2933; }",
+            "    table { border-collapse: collapse; width: 100%; }",
+            "    th, td { border: 1px solid #d9e2ec; padding: 8px 10px; vertical-align: top; }",
+            "    th { background: #f0f4f8; text-align: left; }",
+            "    ul { margin: 0; padding-left: 18px; }",
+            "    a { color: #0b5fff; text-decoration: none; }",
+            "    a:hover { text-decoration: underline; }",
+            "  </style>",
+            "</head>",
+            "<body>",
+            "  <h2>Rekry-tutka: viikon top 10 avainsanat</h2>",
+            "  <table>",
+            "    <thead>",
+            "      <tr><th>Avainsana</th><th>Esiintymat</th><th>Esimerkkiesiintymat</th></tr>",
+            "    </thead>",
+            "    <tbody>",
+            *[f"      {row}" for row in table_rows],
+            "    </tbody>",
+            "  </table>",
+            "</body>",
+            "</html>",
+        ]
+    )
 
 
 def _load_keywords(value: str) -> list[str]:
@@ -94,7 +155,19 @@ def _load_keywords(value: str) -> list[str]:
     return keywords
 
 
-def _format_markdown_link(title: str, url: str) -> str:
-    safe_title = title.replace("[", "\\[").replace("]", "\\]").replace("|", "\\|")
-    safe_url = url.replace(")", "%29")
+def _format_markdown_link(link: KeywordReportLink) -> str:
+    safe_title = _link_label(link).replace("[", "\\[").replace("]", "\\]").replace("|", "\\|")
+    safe_url = link.source_url.replace(")", "%29")
     return f"[{safe_title}]({safe_url})"
+
+
+def _format_html_link(link: KeywordReportLink) -> str:
+    label = escape(_link_label(link))
+    url = escape(quote(link.source_url, safe="/:#?&=%@+~!$,;'()*[]"))
+    return f'<a href="{url}">{label}</a>'
+
+
+def _link_label(link: KeywordReportLink) -> str:
+    if link.source_name:
+        return f"{link.title} ({link.source_name})"
+    return link.title

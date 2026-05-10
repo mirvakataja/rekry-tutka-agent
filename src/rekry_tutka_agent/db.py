@@ -100,6 +100,7 @@ class DocumentStore:
             """
             SELECT
                 documents.id AS document_id,
+                documents.source_name,
                 documents.title,
                 documents.source_url,
                 documents.discovered_at,
