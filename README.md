@@ -114,6 +114,32 @@ Raportin asetuksia voi säätää:
 - `--top 10` - tulostettavien avainsanojen määrä
 - `--links 3` - esimerkkilinkkien määrä per avainsana
 
+## GitHub Actions -sähköpostiraportti
+
+Repo sisältää workflow'n `.github/workflows/weekly-keyword-report.yml`, joka:
+
+- ajaa artikkelien ja keskustelujen keruun päivittäin
+- säilyttää SQLite-tietokannan GitHub Actions -cachella ajojen välillä
+- ajaa sunnuntaisin LLM-avainsana-analyysin uusille tai muuttuneille dokumenteille
+- muodostaa viikoittaisen top10-avainsanataulukon
+- lähettää taulukon sähköpostiin `mirva.kataja@me.com`
+
+Workflow'n voi käynnistää myös käsin GitHubin Actions-näkymästä.
+
+Lisää repositoryyn seuraavat GitHub Secrets -arvot:
+
+- `OPENAI_API_KEY` - LLM-avain avainsana-analyysiä varten
+- `SMTP_SERVER` - SMTP-palvelin, esimerkiksi `smtp.example.com`
+- `SMTP_PORT` - SMTP-portti, esimerkiksi `465` tai `587`
+- `SMTP_USERNAME` - SMTP-käyttäjätunnus
+- `SMTP_PASSWORD` - SMTP-salasana tai sovelluskohtainen salasana
+- `SMTP_FROM` - vapaaehtoinen lähettäjäosoite; jos puuttuu, käytetään `SMTP_USERNAME`
+
+Valinnaiset GitHub Variables -arvot:
+
+- `REKRY_TUTKA_LLM_MODEL` - oletuksena `gpt-4o-mini`
+- `OPENAI_BASE_URL` - oletuksena `https://api.openai.com/v1`
+
 ## Tietokanta
 
 Agentti luo automaattisesti neljä taulua:
