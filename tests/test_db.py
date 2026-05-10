@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from rekry_tutka_agent.db import DocumentStore
-from rekry_tutka_agent.models import CollectedItem
+from rekry_tutka_agent.models import CollectedItem, KeywordAnalysis
 
 
 class DocumentStoreTests(unittest.TestCase):
@@ -40,6 +40,42 @@ class DocumentStoreTests(unittest.TestCase):
                 ).fetchone()
 
             self.assertEqual(row, ("Talent acquisition trends", "Updated content", "https://example.com/article"))
+
+    def test_keyword_analysis_is_selected_until_content_hash_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+            item = CollectedItem(
+                source_name="Example",
+                title="Talent acquisition trends",
+                publication_date=None,
+                content="Candidates discuss AI sourcing.",
+                source_url="https://example.com/article",
+            )
+
+            with DocumentStore(database) as store:
+                store.initialize()
+                store.upsert_item(item)
+                documents = store.documents_for_keyword_analysis()
+                self.assertEqual(len(documents), 1)
+
+                store.save_keyword_analysis(
+                    KeywordAnalysis(
+                        document_id=documents[0].id,
+                        keywords=("ai sourcing", "candidate experience"),
+                        model="test-model",
+                        prompt_version="test-v1",
+                        content_hash=documents[0].content_hash,
+                    )
+                )
+                self.assertEqual(store.documents_for_keyword_analysis(), [])
+                self.assertEqual(len(store.documents_for_keyword_analysis(force=True)), 1)
+
+            with sqlite3.connect(database) as connection:
+                keywords_json = connection.execute(
+                    "SELECT keywords_json FROM document_keyword_analysis"
+                ).fetchone()[0]
+
+            self.assertEqual(keywords_json, '["ai sourcing", "candidate experience"]')
 
 
 if __name__ == "__main__":

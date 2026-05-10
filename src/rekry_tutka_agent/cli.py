@@ -9,6 +9,7 @@ from pathlib import Path
 from .agent import TalentAcquisitionAgent
 from .config import load_sources
 from .db import DocumentStore
+from .llm import OpenAICompatibleChatModel, analyze_stored_documents
 
 DEFAULT_DATABASE = Path("data/rekry_tutka.db")
 DEFAULT_SOURCES = Path("config/sources.json")
@@ -37,6 +38,27 @@ def main(argv: list[str] | None = None) -> int:
             fetch_linked_content=not args.no_fetch_linked_content,
         )
         result = agent.run()
+        print(json.dumps(asdict(result), indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "analyze-keywords":
+        if args.max_keywords < 1 or args.max_keywords > 5:
+            parser.error("--max-keywords must be between 1 and 5")
+
+        chat_model = OpenAICompatibleChatModel.from_environment(
+            model=args.model,
+            base_url=args.base_url,
+            api_key_env=args.api_key_env,
+        )
+        result = analyze_stored_documents(
+            database_path=args.database,
+            chat_model=chat_model,
+            limit=args.limit,
+            force=args.force,
+            max_keywords=args.max_keywords,
+            content_char_limit=args.content_chars,
+            output_language=args.output_language,
+        )
         print(json.dumps(asdict(result), indent=2, sort_keys=True))
         return 0
 
@@ -69,6 +91,46 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-fetch-linked-content",
         action="store_true",
         help="Store feed content only instead of fetching each original link.",
+    )
+
+    analyze = subparsers.add_parser(
+        "analyze-keywords",
+        help="Use an LLM to extract up to five keywords for stored documents.",
+    )
+    analyze.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="SQLite database path.")
+    analyze.add_argument("--limit", type=int, default=None, help="Maximum number of documents to analyze.")
+    analyze.add_argument("--force", action="store_true", help="Re-analyze documents even when content is unchanged.")
+    analyze.add_argument(
+        "--max-keywords",
+        type=int,
+        default=5,
+        help="Maximum number of keywords to store per document. Must be between 1 and 5.",
+    )
+    analyze.add_argument(
+        "--content-chars",
+        type=int,
+        default=8_000,
+        help="Maximum number of content characters sent to the LLM per document.",
+    )
+    analyze.add_argument(
+        "--output-language",
+        default="Finnish",
+        help="Preferred keyword language for the LLM response.",
+    )
+    analyze.add_argument(
+        "--model",
+        default=None,
+        help="LLM model name. Defaults to REKRY_TUTKA_LLM_MODEL or gpt-4o-mini.",
+    )
+    analyze.add_argument(
+        "--base-url",
+        default=None,
+        help="OpenAI-compatible API base URL. Defaults to OPENAI_BASE_URL or https://api.openai.com/v1.",
+    )
+    analyze.add_argument(
+        "--api-key-env",
+        default="OPENAI_API_KEY",
+        help="Environment variable that contains the LLM API key.",
     )
 
     return parser
