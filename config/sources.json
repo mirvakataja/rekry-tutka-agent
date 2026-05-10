@@ -1,6 +1,34 @@
 {
   "sources": [
     {
+      "name": "Yle - Tyoelama",
+      "type": "feed",
+      "url": "https://yle.fi/rss/t/18-218737/fi",
+      "tags": ["news", "yle", "tyoelama", "talent-acquisition"],
+      "fetch_content": true
+    },
+    {
+      "name": "Yle - Tyonvalitys",
+      "type": "feed",
+      "url": "https://yle.fi/rss/t/18-218660/fi",
+      "tags": ["news", "yle", "tyonvalitys", "recruiting"],
+      "fetch_content": true
+    },
+    {
+      "name": "Duunitori Tyoelama - Rekrytointi",
+      "type": "feed",
+      "url": "https://tyoelama.duunitori.fi/rekrytointi/feed/",
+      "tags": ["duunitori", "tyoelama", "rekrytointi", "talent-acquisition"],
+      "fetch_content": true
+    },
+    {
+      "name": "Duunitori Tyoelama",
+      "type": "feed",
+      "url": "https://tyoelama.duunitori.fi/feed/",
+      "tags": ["duunitori", "tyoelama", "worklife"],
+      "fetch_content": true
+    },
+    {
       "name": "Google News - talent acquisition trends",
       "type": "feed",
       "url": "https://news.google.com/rss/search?q=%22talent%20acquisition%22%20trends&hl=en-US&gl=US&ceid=US:en",
