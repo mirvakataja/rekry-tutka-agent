@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -89,6 +90,51 @@ class DocumentStoreTests(unittest.TestCase):
                 last_finished = store.task_last_finished_at("daily-ingestion")
 
             self.assertIsNotNone(last_finished)
+
+    def test_delete_documents_published_before_removes_old_documents_and_keyword_analysis(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+
+            with DocumentStore(database) as store:
+                store.initialize()
+                old = CollectedItem(
+                    source_name="Example",
+                    title="Old article",
+                    publication_date="2024-12-31T23:00:00+00:00",
+                    content="Old content",
+                    source_url="https://example.com/old",
+                )
+                fresh = CollectedItem(
+                    source_name="Example",
+                    title="Fresh article",
+                    publication_date="2025-01-01T00:00:00+00:00",
+                    content="Fresh content",
+                    source_url="https://example.com/fresh",
+                )
+                store.upsert_item(old)
+                store.upsert_item(fresh)
+                old_document = store.documents_for_keyword_analysis(force=True)[0]
+                store.save_keyword_analysis(
+                    KeywordAnalysis(
+                        document_id=old_document.id,
+                        keywords=("legacy",),
+                        model="test-model",
+                        prompt_version="test-v1",
+                        content_hash=old_document.content_hash,
+                    )
+                )
+
+                deleted_count = store.delete_documents_published_before(
+                    datetime(2025, 1, 1, tzinfo=timezone.utc)
+                )
+
+            with sqlite3.connect(database) as connection:
+                documents = connection.execute("SELECT title FROM documents ORDER BY title").fetchall()
+                analyses = connection.execute("SELECT COUNT(*) FROM document_keyword_analysis").fetchone()[0]
+
+            self.assertEqual(deleted_count, 1)
+            self.assertEqual(documents, [("Fresh article",)])
+            self.assertEqual(analyses, 0)
 
 
 if __name__ == "__main__":

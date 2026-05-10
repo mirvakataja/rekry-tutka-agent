@@ -41,6 +41,13 @@ PYTHONPATH=src python3 -m rekry_tutka_agent run \
   --limit 20
 ```
 
+Keruu ohittaa oletuksena dokumentit, joiden luettava julkaisupäivä on yli 365
+päivää vanha. Rajaa voi säätää:
+
+```bash
+PYTHONPATH=src python3 -m rekry_tutka_agent run --max-article-age-days 365
+```
+
 Jos haluat tallentaa vain syötteissä olevan sisällön ilman alkuperäisten
 linkkien hakemista:
 
@@ -50,6 +57,25 @@ PYTHONPATH=src python3 -m rekry_tutka_agent run --no-fetch-linked-content
 
 Komento tulostaa JSON-yhteenvedon ajosta, esimerkiksi montako dokumenttia
 lisättiin, päivitettiin tai jätettiin ennalleen.
+
+### Vanhojen dokumenttien siivous
+
+Poista tietokannasta ennen vuotta 2025 julkaistut dokumentit:
+
+```bash
+PYTHONPATH=src python3 -m rekry_tutka_agent cleanup-old-documents \
+  --database data/rekry_tutka.db
+```
+
+Oletusraja on `2025-01-01`. Muun rajan voi antaa muodossa `YYYY-MM-DD`:
+
+```bash
+PYTHONPATH=src python3 -m rekry_tutka_agent cleanup-old-documents \
+  --before-date 2025-01-01
+```
+
+Siivous poistaa myös poistettuihin dokumentteihin liittyvät LLM-avainsana-analyysit.
+Jos dokumentin julkaisupäivää ei voi jäsentää, sitä ei poisteta automaattisesti.
 
 ### Päivittäinen keruu
 

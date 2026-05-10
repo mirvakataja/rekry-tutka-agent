@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -54,6 +55,7 @@ class TalentAcquisitionAgentTests(unittest.TestCase):
                 sources=[SourceConfig(name="Example", url=feed_url)],
                 database_path=database,
                 fetcher=FakeFetcher({feed_url: feed, article_url: article}),
+                now=datetime(2026, 5, 10, tzinfo=timezone.utc),
             )
 
             result = agent.run()
@@ -87,6 +89,7 @@ class TalentAcquisitionAgentTests(unittest.TestCase):
                 sources=[SourceConfig(name="Discussion", url=feed_url, fetch_content=False)],
                 database_path=database,
                 fetcher=FakeFetcher({feed_url: feed}),
+                now=datetime(2026, 5, 10, tzinfo=timezone.utc),
             )
 
             result = agent.run()
@@ -97,6 +100,45 @@ class TalentAcquisitionAgentTests(unittest.TestCase):
                 content = connection.execute("SELECT content FROM documents").fetchone()[0]
 
         self.assertEqual(content, "Discussion content from feed.")
+
+    def test_agent_skips_items_older_than_max_article_age(self) -> None:
+        feed_url = "https://example.com/feed.xml"
+        old_article_url = "https://example.com/old"
+        fresh_article_url = "https://example.com/fresh"
+        feed = f"""<rss><channel>
+          <item>
+            <title>Old recruiting trend</title>
+            <link>{old_article_url}</link>
+            <pubDate>Sun, 01 Jan 2023 00:00:00 +0000</pubDate>
+            <description>Old content.</description>
+          </item>
+          <item>
+            <title>Fresh recruiting trend</title>
+            <link>{fresh_article_url}</link>
+            <pubDate>Sun, 01 Mar 2026 00:00:00 +0000</pubDate>
+            <description>Fresh content.</description>
+          </item>
+        </channel></rss>"""
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+            agent = TalentAcquisitionAgent(
+                sources=[SourceConfig(name="Example", url=feed_url, fetch_content=False)],
+                database_path=database,
+                fetcher=FakeFetcher({feed_url: feed}),
+                now=datetime(2026, 5, 10, tzinfo=timezone.utc),
+                max_article_age_days=365,
+            )
+
+            result = agent.run()
+
+            self.assertEqual(result.items_seen, 2)
+            self.assertEqual(result.inserted_count, 1)
+
+            with sqlite3.connect(database) as connection:
+                rows = connection.execute("SELECT title, source_url FROM documents").fetchall()
+
+        self.assertEqual(rows, [("Fresh recruiting trend", fresh_article_url)])
 
 
 if __name__ == "__main__":

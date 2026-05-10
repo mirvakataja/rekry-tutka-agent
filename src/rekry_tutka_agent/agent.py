@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 import logging
 from pathlib import Path
 from uuid import uuid4
 
+from .date_utils import parse_date
 from .db import DocumentStore
 from .fetchers import FetchError, HttpFetcher, TextFetcher
 from .html_extract import extract_html
@@ -25,12 +27,16 @@ class TalentAcquisitionAgent:
         fetcher: TextFetcher | None = None,
         max_items_per_source: int | None = None,
         fetch_linked_content: bool = True,
+        max_article_age_days: int | None = 365,
+        now: datetime | None = None,
     ) -> None:
         self.sources = sources
         self.database_path = database_path
         self.fetcher = fetcher or HttpFetcher()
         self.max_items_per_source = max_items_per_source
         self.fetch_linked_content = fetch_linked_content
+        self.max_article_age_days = max_article_age_days
+        self.now = _coerce_utc(now or datetime.now(timezone.utc))
 
     def run(self) -> IngestionResult:
         run_id = str(uuid4())
@@ -55,6 +61,10 @@ class TalentAcquisitionAgent:
 
                 for item in items:
                     items_seen += 1
+                    if self._is_too_old(item):
+                        LOGGER.info("Skipping %s because it is older than the configured age limit", item.source_url)
+                        continue
+
                     enriched = item
                     if self.fetch_linked_content and source.fetch_content:
                         try:
@@ -65,6 +75,10 @@ class TalentAcquisitionAgent:
 
                     if not enriched.content:
                         LOGGER.info("Skipping %s because it did not contain readable content", enriched.source_url)
+                        continue
+
+                    if self._is_too_old(enriched):
+                        LOGGER.info("Skipping %s because it is older than the configured age limit", enriched.source_url)
                         continue
 
                     status = store.upsert_item(enriched)
@@ -124,3 +138,20 @@ class TalentAcquisitionAgent:
             publication_date=publication_date,
             metadata=metadata,
         )
+
+    def _is_too_old(self, item: CollectedItem) -> bool:
+        if self.max_article_age_days is None or not item.publication_date:
+            return False
+
+        publication_date = parse_date(item.publication_date)
+        if publication_date is None:
+            return False
+
+        cutoff = self.now - timedelta(days=self.max_article_age_days)
+        return publication_date < cutoff
+
+
+def _coerce_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
