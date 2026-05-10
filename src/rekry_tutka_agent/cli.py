@@ -10,7 +10,7 @@ from .agent import TalentAcquisitionAgent
 from .config import load_sources
 from .db import DocumentStore
 from .llm import LLMError, OpenAICompatibleChatModel, analyze_stored_documents
-from .reports import build_weekly_keyword_report, format_keyword_report_html, format_keyword_report_table
+from .reports import DEFAULT_BLOCKED_KEYWORDS, build_weekly_keyword_report, format_keyword_report_html, format_keyword_report_table
 from .scheduler import run_scheduler_loop
 
 DEFAULT_DATABASE = Path("data/rekry_tutka.db")
@@ -76,11 +76,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.links < 1:
             parser.error("--links must be at least 1")
 
+        blocked_keywords = tuple(args.blocked_keyword)
+        if not args.no_default_blocked_keywords:
+            blocked_keywords = (*DEFAULT_BLOCKED_KEYWORDS, *blocked_keywords)
+
         rows = build_weekly_keyword_report(
             database_path=str(args.database),
             days=args.days,
             top_n=args.top,
             links_per_keyword=args.links,
+            blocked_keywords=blocked_keywords,
         )
         if args.format == "html":
             print(format_keyword_report_html(rows))
@@ -202,6 +207,20 @@ def _build_parser() -> argparse.ArgumentParser:
     report.add_argument("--days", type=int, default=7, help="Window size in days.")
     report.add_argument("--top", type=int, default=10, help="Number of top keywords to print.")
     report.add_argument("--links", type=int, default=3, help="Number of occurrence links per keyword.")
+    report.add_argument(
+        "--blocked-keyword",
+        action="append",
+        default=[],
+        help="Additional keyword to exclude from the report. Can be provided multiple times.",
+    )
+    report.add_argument(
+        "--no-default-blocked-keywords",
+        action="store_true",
+        help=(
+            "Do not exclude the default generic recruitment terms: "
+            "rekrytointi, talent acquisition, recruiting, recruitment."
+        ),
+    )
     report.add_argument(
         "--format",
         choices=("markdown", "html"),
