@@ -29,6 +29,28 @@ class CollectedItem:
 
 
 @dataclass(frozen=True)
+class StoredDocument:
+    """Document loaded from the database for downstream analysis."""
+
+    id: int
+    title: str
+    content: str
+    source_url: str
+    content_hash: str
+
+
+@dataclass(frozen=True)
+class KeywordAnalysis:
+    """LLM-produced keywords for one stored document."""
+
+    document_id: int
+    keywords: tuple[str, ...]
+    model: str
+    prompt_version: str
+    content_hash: str
+
+
+@dataclass(frozen=True)
 class IngestionResult:
     """Summary of one agent run."""
 
@@ -38,4 +60,14 @@ class IngestionResult:
     inserted_count: int
     updated_count: int
     unchanged_count: int
+    error_count: int
+
+
+@dataclass(frozen=True)
+class KeywordAnalysisResult:
+    """Summary of one keyword analysis run."""
+
+    documents_checked: int
+    analyzed_count: int
+    skipped_count: int
     error_count: int

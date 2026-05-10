@@ -7,7 +7,7 @@ from pathlib import Path
 import sqlite3
 from typing import Literal
 
-from .models import CollectedItem
+from .models import CollectedItem, KeywordAnalysis, StoredDocument
 
 UpsertStatus = Literal["inserted", "updated", "unchanged"]
 
@@ -64,6 +64,16 @@ class DocumentStore:
                 ON documents(publication_date);
             CREATE INDEX IF NOT EXISTS idx_documents_source_name
                 ON documents(source_name);
+
+            CREATE TABLE IF NOT EXISTS document_keyword_analysis (
+                document_id INTEGER PRIMARY KEY,
+                keywords_json TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt_version TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                analyzed_at TEXT NOT NULL,
+                FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
+            );
             """
         )
         self.connection.commit()
@@ -182,6 +192,84 @@ class DocumentStore:
         )
         self.connection.commit()
         return "updated"
+
+    def documents_for_keyword_analysis(
+        self,
+        *,
+        limit: int | None = None,
+        force: bool = False,
+    ) -> list[StoredDocument]:
+        where_clause = ""
+        if not force:
+            where_clause = """
+            WHERE analysis.document_id IS NULL
+               OR analysis.content_hash != documents.content_hash
+            """
+
+        limit_clause = ""
+        parameters: tuple[int, ...] = ()
+        if limit is not None:
+            limit_clause = "LIMIT ?"
+            parameters = (limit,)
+
+        rows = self.connection.execute(
+            f"""
+            SELECT
+                documents.id,
+                documents.title,
+                documents.content,
+                documents.source_url,
+                documents.content_hash
+            FROM documents
+            LEFT JOIN document_keyword_analysis AS analysis
+                ON analysis.document_id = documents.id
+            {where_clause}
+            ORDER BY documents.id
+            {limit_clause}
+            """,
+            parameters,
+        ).fetchall()
+
+        return [
+            StoredDocument(
+                id=row["id"],
+                title=row["title"],
+                content=row["content"],
+                source_url=row["source_url"],
+                content_hash=row["content_hash"],
+            )
+            for row in rows
+        ]
+
+    def save_keyword_analysis(self, analysis: KeywordAnalysis) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO document_keyword_analysis (
+                document_id,
+                keywords_json,
+                model,
+                prompt_version,
+                content_hash,
+                analyzed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(document_id) DO UPDATE SET
+                keywords_json = excluded.keywords_json,
+                model = excluded.model,
+                prompt_version = excluded.prompt_version,
+                content_hash = excluded.content_hash,
+                analyzed_at = excluded.analyzed_at
+            """,
+            (
+                analysis.document_id,
+                json.dumps(list(analysis.keywords), ensure_ascii=False),
+                analysis.model,
+                analysis.prompt_version,
+                analysis.content_hash,
+                _utc_now(),
+            ),
+        )
+        self.connection.commit()
 
 
 def _content_hash(item: CollectedItem) -> str:
