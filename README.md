@@ -89,6 +89,11 @@ useaan kertaan. Jos otsikko, päivämäärä tai sisältö muuttuu, rivi päivit
 
 ## Lähteiden lisääminen
 
+Oletuskonfiguraatio sisältää jo Ylen työelämä- ja työnvälityssyötteet sekä
+Duunitorin Työelämä-sivuston yleisen ja rekrytointiaiheisen syötteen. Redditin
+puolelta mukana ovat `r/recruiting`, `r/Recruitment`,
+`r/RecruitmentAnalytics` ja `r/TalentAcquisition`.
+
 Lisää uusi RSS- tai Atom-lähde `config/sources.json`-tiedostoon:
 
 ```json
