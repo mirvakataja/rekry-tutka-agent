@@ -148,6 +148,40 @@ class KeywordAnalyzerTests(unittest.TestCase):
         )
         self.assertIn("skills-based hiring", chat_model.messages[0][1]["content"])
 
+    def test_summarize_weekly_trends_accepts_focus_area(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+            with DocumentStore(database) as store:
+                store.initialize()
+                store.upsert_item(
+                    CollectedItem(
+                        source_name="Example",
+                        title="Tech recruiting report",
+                        publication_date=None,
+                        content="Tech recruiting content",
+                        source_url="https://example.com/tech",
+                    )
+                )
+                document = store.documents_for_keyword_analysis(force=True)[0]
+                store.save_keyword_analysis(
+                    KeywordAnalysis(
+                        document_id=document.id,
+                        keywords=("developer hiring",),
+                        model="test-model",
+                        prompt_version="test-v1",
+                        content_hash=document.content_hash,
+                    )
+                )
+            chat_model = FakeChatModel('{"trends": ["Tech-rekrytointi painottuu osaamissignaaleihin."]}')
+
+            summarize_weekly_trends(
+                database_path=str(database),
+                chat_model=chat_model,
+                focus_area="tech/IT alan rekrytointi",
+            )
+
+        self.assertIn("tech/IT alan rekrytointi", chat_model.messages[0][1]["content"])
+
 
 if __name__ == "__main__":
     unittest.main()

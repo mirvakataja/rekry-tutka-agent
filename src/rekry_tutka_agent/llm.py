@@ -184,6 +184,7 @@ def summarize_weekly_trends(
     days: int = 7,
     max_bullets: int = 5,
     output_language: str = "Finnish",
+    focus_area: str = "talent acquisition",
 ) -> tuple[str, ...]:
     report_rows = build_weekly_keyword_report(database_path=database_path, days=days, top_n=20, links_per_keyword=3)
     if not report_rows:
@@ -193,13 +194,18 @@ def summarize_weekly_trends(
         {
             "role": "system",
             "content": (
-                "You analyze talent acquisition signals from weekly keyword data. "
+                f"You analyze {focus_area} signals from weekly keyword data. "
                 "Return only JSON with a 'trends' array. Each trend must be one concise bullet-worthy sentence."
             ),
         },
         {
             "role": "user",
-            "content": _build_trend_summary_prompt(report_rows, max_bullets=max_bullets, output_language=output_language),
+            "content": _build_trend_summary_prompt(
+                report_rows,
+                max_bullets=max_bullets,
+                output_language=output_language,
+                focus_area=focus_area,
+            ),
         },
     ]
     response_text = chat_model.complete(messages)
@@ -276,14 +282,20 @@ def sanitize_trends(trends: list[str], *, max_bullets: int = 5) -> list[str]:
     return clean_trends
 
 
-def _build_trend_summary_prompt(report_rows: object, *, max_bullets: int, output_language: str) -> str:
+def _build_trend_summary_prompt(
+    report_rows: object,
+    *,
+    max_bullets: int,
+    output_language: str,
+    focus_area: str,
+) -> str:
     lines = []
     for row in report_rows:
         examples = "; ".join(f"{link.title} ({link.source_name})" for link in row.occurrence_links)
         lines.append(f"- {row.keyword}: {row.count} occurrence(s). Examples: {examples}")
 
     return (
-        f"Based on this weekly talent acquisition keyword data, identify {max_bullets} emerging trends. "
+        f"Based on this weekly keyword data, identify {max_bullets} emerging trends about {focus_area}. "
         f"Answer in {output_language}. Avoid restating generic keywords. "
         "Return JSON exactly like: {\"trends\": [\"trend sentence\"]}.\n\n"
         + "\n".join(lines)
