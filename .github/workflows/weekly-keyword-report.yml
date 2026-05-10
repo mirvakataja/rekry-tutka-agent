@@ -25,7 +25,9 @@ permissions:
 env:
   DATABASE_PATH: data/rekry_tutka.db
   SOURCES_PATH: config/sources.json
-  REPORT_PATH: reports/weekly-keyword-report.html
+  REPORT_PATH: reports/weekly-email-report.html
+  TREND_SUMMARY_PATH: reports/weekly-trend-summary.html
+  KEYWORD_TABLE_PATH: reports/weekly-keyword-table.html
   REPORT_RECIPIENT: mirva.kataja@me.com
   INGESTION_LIMIT: ${{ github.event.inputs.ingestion_limit || '50' }}
   REKRY_TUTKA_LLM_MODEL: ${{ vars.REKRY_TUTKA_LLM_MODEL || 'gpt-4o-mini' }}
@@ -107,16 +109,55 @@ jobs:
             --max-keywords 5 \
             --output-language Finnish
 
+      - name: Build weekly trend summary
+        if: steps.report_schedule.outputs.send_email == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          mkdir -p reports
+          python -m rekry_tutka_agent weekly-trend-summary \
+            --database "$DATABASE_PATH" \
+            --days 7 \
+            --bullets 5 \
+            --output-language Finnish \
+            --format html > "$TREND_SUMMARY_PATH"
+
       - name: Build weekly keyword report
         if: steps.report_schedule.outputs.send_email == 'true'
         run: |
-          mkdir -p "$(dirname "$REPORT_PATH")"
+          mkdir -p reports
           python -m rekry_tutka_agent weekly-keyword-report \
             --database "$DATABASE_PATH" \
             --days 7 \
             --top 10 \
-            --links 3 \
-            --format html > "$REPORT_PATH"
+            --links 5 \
+            --format html-fragment > "$KEYWORD_TABLE_PATH"
+          {
+            cat <<'HTML'
+          <!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: Arial, sans-serif; color: #1f2933; }
+              table { border-collapse: collapse; width: 100%; }
+              th, td { border: 1px solid #d9e2ec; padding: 8px 10px; vertical-align: top; }
+              th { background: #f0f4f8; text-align: left; }
+              ul { margin: 0; padding-left: 18px; }
+              a { color: #0b5fff; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+              section { margin-bottom: 24px; }
+            </style>
+          </head>
+          <body>
+          HTML
+            cat "$TREND_SUMMARY_PATH"
+            cat "$KEYWORD_TABLE_PATH"
+            cat <<'HTML'
+          </body>
+          </html>
+          HTML
+          } > "$REPORT_PATH"
           cat "$REPORT_PATH"
 
       - name: Email weekly keyword report

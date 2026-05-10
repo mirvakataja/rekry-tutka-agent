@@ -7,7 +7,13 @@ import unittest
 
 from rekry_tutka_agent.db import DocumentStore
 from rekry_tutka_agent.models import CollectedItem, KeywordAnalysis
-from rekry_tutka_agent.reports import build_weekly_keyword_report, format_keyword_report_html, format_keyword_report_table
+from rekry_tutka_agent.reports import (
+    build_weekly_keyword_report,
+    format_keyword_report_html,
+    format_keyword_report_html_fragment,
+    format_keyword_report_table,
+    format_trend_summary_html,
+)
 
 
 class WeeklyKeywordReportTests(unittest.TestCase):
@@ -163,6 +169,19 @@ class WeeklyKeywordReportTests(unittest.TestCase):
         self.assertIn("<table>", html)
         self.assertIn('<a href="https://example.com/report">Recruiting analytics report (Example Source)</a>', html)
         self.assertNotIn(">https://example.com/report<", html)
+
+    def test_report_formats_html_fragment_without_document_wrapper(self) -> None:
+        html = format_keyword_report_html_fragment([])
+
+        self.assertIn("<section>", html)
+        self.assertIn("<table>", html)
+        self.assertNotIn("<html>", html)
+
+    def test_trend_summary_formats_html_bullets(self) -> None:
+        html = format_trend_summary_html(("Osaamispohjainen rekrytointi kasvaa.", "Analytiikka yleistyy."))
+
+        self.assertIn("<h2>Nousevat talent acquisition -trendit</h2>", html)
+        self.assertIn("<li>Osaamispohjainen rekrytointi kasvaa.</li>", html)
 
 
 if __name__ == "__main__":

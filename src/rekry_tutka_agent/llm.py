@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 
 from .models import KeywordAnalysis, KeywordAnalysisResult, StoredDocument
 from .db import DocumentStore
+from .reports import build_weekly_keyword_report
 
 PROMPT_VERSION = "keyword-topics-v1"
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -176,6 +177,39 @@ def analyze_stored_documents(
     )
 
 
+def summarize_weekly_trends(
+    *,
+    database_path: str,
+    chat_model: ChatModel,
+    days: int = 7,
+    max_bullets: int = 5,
+    output_language: str = "Finnish",
+) -> tuple[str, ...]:
+    report_rows = build_weekly_keyword_report(database_path=database_path, days=days, top_n=20, links_per_keyword=3)
+    if not report_rows:
+        return ("Ei riittavasti uutta dataa nousevien trendien arviointiin.",)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You analyze talent acquisition signals from weekly keyword data. "
+                "Return only JSON with a 'trends' array. Each trend must be one concise bullet-worthy sentence."
+            ),
+        },
+        {
+            "role": "user",
+            "content": _build_trend_summary_prompt(report_rows, max_bullets=max_bullets, output_language=output_language),
+        },
+    ]
+    response_text = chat_model.complete(messages)
+    trends = sanitize_trends(extract_trends(response_text), max_bullets=max_bullets)
+    if not trends:
+        raise LLMError("LLM returned no usable trend bullets")
+
+    return tuple(trends)
+
+
 def extract_keywords(response_text: str) -> list[str]:
     payload = _load_json_response(response_text)
     if isinstance(payload, dict):
@@ -189,6 +223,21 @@ def extract_keywords(response_text: str) -> list[str]:
         raise LLMError("LLM response 'keywords' field was not a list")
 
     return [str(keyword) for keyword in raw_keywords]
+
+
+def extract_trends(response_text: str) -> list[str]:
+    payload = _load_json_response(response_text)
+    if isinstance(payload, dict):
+        raw_trends = payload.get("trends", [])
+    elif isinstance(payload, list):
+        raw_trends = payload
+    else:
+        raw_trends = []
+
+    if not isinstance(raw_trends, list):
+        raise LLMError("LLM response 'trends' field was not a list")
+
+    return [str(trend) for trend in raw_trends]
 
 
 def sanitize_keywords(keywords: list[str], *, max_keywords: int = 5) -> list[str]:
@@ -205,6 +254,40 @@ def sanitize_keywords(keywords: list[str], *, max_keywords: int = 5) -> list[str
             break
 
     return clean_keywords
+
+
+def sanitize_trends(trends: list[str], *, max_bullets: int = 5) -> list[str]:
+    clean_trends: list[str] = []
+    seen: set[str] = set()
+    for trend in trends:
+        normalized = re.sub(r"\s+", " ", trend).strip(" -\n\t")
+        if not normalized:
+            continue
+
+        key = normalized.lower()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        clean_trends.append(normalized[:240])
+        if len(clean_trends) >= max_bullets:
+            break
+
+    return clean_trends
+
+
+def _build_trend_summary_prompt(report_rows: object, *, max_bullets: int, output_language: str) -> str:
+    lines = []
+    for row in report_rows:
+        examples = "; ".join(f"{link.title} ({link.source_name})" for link in row.occurrence_links)
+        lines.append(f"- {row.keyword}: {row.count} occurrence(s). Examples: {examples}")
+
+    return (
+        f"Based on this weekly talent acquisition keyword data, identify {max_bullets} emerging trends. "
+        f"Answer in {output_language}. Avoid restating generic keywords. "
+        "Return JSON exactly like: {\"trends\": [\"trend sentence\"]}.\n\n"
+        + "\n".join(lines)
+    )
 
 
 def _load_json_response(response_text: str) -> Any:
