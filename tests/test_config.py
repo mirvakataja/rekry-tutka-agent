@@ -16,6 +16,15 @@ class SourceConfigTests(unittest.TestCase):
         self.assertIn("Duunitori Tyoelama - Rekrytointi", names)
         self.assertIn("Duunitori Tyoelama", names)
 
+    def test_default_sources_include_requested_reddit_subreddits(self) -> None:
+        sources = load_sources(Path("config/sources.json"))
+        urls = {source.url for source in sources}
+
+        self.assertIn("https://www.reddit.com/r/recruiting/.rss", urls)
+        self.assertIn("https://www.reddit.com/r/Recruitment/.rss", urls)
+        self.assertIn("https://www.reddit.com/r/RecruitmentAnalytics/.rss", urls)
+        self.assertIn("https://www.reddit.com/r/TalentAcquisition/.rss", urls)
+
 
 if __name__ == "__main__":
     unittest.main()

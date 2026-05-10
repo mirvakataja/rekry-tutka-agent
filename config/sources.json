@@ -43,10 +43,31 @@
       "fetch_content": true
     },
     {
-      "name": "Reddit search - recruiting discussions",
+      "name": "Reddit - r/recruiting",
       "type": "feed",
-      "url": "https://www.reddit.com/search.rss?q=%22talent%20acquisition%22%20recruiting&sort=new",
-      "tags": ["discussion", "recruiting"],
+      "url": "https://www.reddit.com/r/recruiting/.rss",
+      "tags": ["discussion", "reddit", "recruiting"],
+      "fetch_content": false
+    },
+    {
+      "name": "Reddit - r/Recruitment",
+      "type": "feed",
+      "url": "https://www.reddit.com/r/Recruitment/.rss",
+      "tags": ["discussion", "reddit", "recruitment"],
+      "fetch_content": false
+    },
+    {
+      "name": "Reddit - r/RecruitmentAnalytics",
+      "type": "feed",
+      "url": "https://www.reddit.com/r/RecruitmentAnalytics/.rss",
+      "tags": ["discussion", "reddit", "recruitment-analytics"],
+      "fetch_content": false
+    },
+    {
+      "name": "Reddit - r/TalentAcquisition",
+      "type": "feed",
+      "url": "https://www.reddit.com/r/TalentAcquisition/.rss",
+      "tags": ["discussion", "reddit", "talent-acquisition"],
       "fetch_content": false
     }
   ]
