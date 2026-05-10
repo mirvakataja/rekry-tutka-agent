@@ -37,8 +37,10 @@ def _source_from_mapping(item: Any, config_path: Path) -> SourceConfig:
         raise ValueError(f"Sources in {config_path} require non-empty name and url values")
 
     source_type = str(item.get("type", "feed")).strip().lower()
-    if source_type != "feed":
-        raise ValueError(f"Unsupported source type '{source_type}' for {name}; only 'feed' is supported")
+    if source_type not in {"feed", "html_listing"}:
+        raise ValueError(
+            f"Unsupported source type '{source_type}' for {name}; supported types are 'feed' and 'html_listing'"
+        )
 
     tags = item.get("tags", [])
     if not isinstance(tags, list):
@@ -51,4 +53,5 @@ def _source_from_mapping(item: Any, config_path: Path) -> SourceConfig:
         enabled=bool(item.get("enabled", True)),
         tags=tuple(str(tag) for tag in tags),
         fetch_content=bool(item.get("fetch_content", True)),
+        link_prefix=str(item["link_prefix"]).strip() if item.get("link_prefix") else None,
     )

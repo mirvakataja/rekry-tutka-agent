@@ -9,7 +9,7 @@ from uuid import uuid4
 from .date_utils import parse_date
 from .db import DocumentStore
 from .fetchers import FetchError, HttpFetcher, TextFetcher
-from .html_extract import extract_html
+from .html_extract import extract_html, extract_links
 from .models import CollectedItem, IngestionResult, SourceConfig
 from .parsers import parse_feed
 
@@ -111,6 +111,9 @@ class TalentAcquisitionAgent:
         )
 
     def _collect_source(self, source: SourceConfig) -> list[CollectedItem]:
+        if source.type == "html_listing":
+            return self._collect_html_listing(source)
+
         if source.type != "feed":
             raise ValueError(f"Unsupported source type: {source.type}")
 
@@ -118,6 +121,32 @@ class TalentAcquisitionAgent:
         items = parse_feed(feed_text, source)
         if self.max_items_per_source is not None:
             return items[: self.max_items_per_source]
+        return items
+
+    def _collect_html_listing(self, source: SourceConfig) -> list[CollectedItem]:
+        listing_html = self.fetcher.fetch_text(source.url)
+        links = extract_links(listing_html, base_url=source.url, path_prefix=source.link_prefix)
+        if self.max_items_per_source is not None:
+            links = links[: self.max_items_per_source]
+
+        items: list[CollectedItem] = []
+        for link in links:
+            article_html = self.fetcher.fetch_text(link)
+            extracted = extract_html(article_html)
+            if not extracted.title:
+                continue
+
+            items.append(
+                CollectedItem(
+                    source_name=source.name,
+                    title=extracted.title,
+                    source_url=link,
+                    content=extracted.content,
+                    publication_date=extracted.publication_date,
+                    metadata={"source_tags": list(source.tags), "source_type": source.type},
+                )
+            )
+
         return items
 
     def _enrich_from_link(self, item: CollectedItem) -> CollectedItem:

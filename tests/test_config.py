@@ -25,6 +25,14 @@ class SourceConfigTests(unittest.TestCase):
         self.assertIn("https://www.reddit.com/r/RecruitmentAnalytics/.rss", urls)
         self.assertIn("https://www.reddit.com/r/TalentAcquisition/.rss", urls)
 
+    def test_default_sources_include_ere_html_listing(self) -> None:
+        sources = load_sources(Path("config/sources.json"))
+        ere = next(source for source in sources if source.name == "ERE - Recruiting")
+
+        self.assertEqual(ere.type, "html_listing")
+        self.assertEqual(ere.url, "https://www.ere.net/categories/recruiting")
+        self.assertEqual(ere.link_prefix, "/articles/")
+
 
 if __name__ == "__main__":
     unittest.main()

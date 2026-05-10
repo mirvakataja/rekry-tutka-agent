@@ -43,6 +43,14 @@
       "fetch_content": true
     },
     {
+      "name": "ERE - Recruiting",
+      "type": "html_listing",
+      "url": "https://www.ere.net/categories/recruiting",
+      "link_prefix": "/articles/",
+      "tags": ["news", "ere", "recruiting", "talent-acquisition"],
+      "fetch_content": true
+    },
+    {
       "name": "Reddit - r/recruiting",
       "type": "feed",
       "url": "https://www.reddit.com/r/recruiting/.rss",

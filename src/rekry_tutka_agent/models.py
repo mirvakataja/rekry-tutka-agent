@@ -14,6 +14,7 @@ class SourceConfig:
     enabled: bool = True
     tags: tuple[str, ...] = ()
     fetch_content: bool = True
+    link_prefix: str | None = None
 
 
 @dataclass(frozen=True)
