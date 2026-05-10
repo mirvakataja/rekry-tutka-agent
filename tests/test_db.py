@@ -77,6 +77,19 @@ class DocumentStoreTests(unittest.TestCase):
 
             self.assertEqual(keywords_json, '["ai sourcing", "candidate experience"]')
 
+    def test_scheduled_task_state_can_be_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+
+            with DocumentStore(database) as store:
+                store.initialize()
+                self.assertIsNone(store.task_last_finished_at("daily-ingestion"))
+                store.mark_task_started("daily-ingestion")
+                store.mark_task_finished("daily-ingestion", "completed")
+                last_finished = store.task_last_finished_at("daily-ingestion")
+
+            self.assertIsNotNone(last_finished)
+
 
 if __name__ == "__main__":
     unittest.main()

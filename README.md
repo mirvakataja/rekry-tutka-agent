@@ -51,6 +51,27 @@ PYTHONPATH=src python3 -m rekry_tutka_agent run --no-fetch-linked-content
 Komento tulostaa JSON-yhteenvedon ajosta, esimerkiksi montako dokumenttia
 lisättiin, päivitettiin tai jätettiin ennalleen.
 
+### Päivittäinen keruu
+
+Pitkään käynnissä oleva ajastin ajaa keruun oletuksena kerran vuorokaudessa ja
+viikoittaisen avainsana-analyysin kerran seitsemässä päivässä:
+
+```bash
+export OPENAI_API_KEY="..."
+
+PYTHONPATH=src python3 -m rekry_tutka_agent schedule \
+  --sources config/sources.json \
+  --database data/rekry_tutka.db
+```
+
+Ajastin tarkistaa oletuksena tunnin välein, onko tehtäviä erääntynyt. Se tallentaa
+viimeisimmät onnistuneet ajot tietokannan `scheduled_tasks`-tauluun. Jos haluat
+ajaa vain erääntyneet tehtävät kerran esimerkiksi ulkoisesta cronista:
+
+```bash
+PYTHONPATH=src python3 -m rekry_tutka_agent schedule --once
+```
+
 ## Avainsanojen LLM-analyysi
 
 Kun dokumentteja on tallennettu tietokantaan, voit pyytää LLM:ää etsimään
@@ -76,13 +97,31 @@ Hyödyllisiä valintoja:
 - `--base-url URL` - vaihtoehtoinen OpenAI-yhteensopiva API-osoite
 - `--api-key-env ENV` - ympäristömuuttuja, josta API-avain luetaan
 
+## Viikoittainen avainsanaraportti
+
+Viikkoraportti laskee tallennetuista avainsanoista, kuinka monessa viikon aikana
+löydetyssä dokumentissa kukin avainsana esiintyy. Komento tulostaa Markdown-
+taulukon, jossa on top10 avainsanaa ja linkit kolmeen esimerkkiesiintymään:
+
+```bash
+PYTHONPATH=src python3 -m rekry_tutka_agent weekly-keyword-report \
+  --database data/rekry_tutka.db
+```
+
+Raportin asetuksia voi säätää:
+
+- `--days 7` - tarkasteluikkuna päivinä
+- `--top 10` - tulostettavien avainsanojen määrä
+- `--links 3` - esimerkkilinkkien määrä per avainsana
+
 ## Tietokanta
 
-Agentti luo automaattisesti kolme taulua:
+Agentti luo automaattisesti neljä taulua:
 
 - `documents` - kerätyt artikkelit ja keskustelut
 - `ingestion_runs` - ajokertojen tilastot ja virheiden määrä
 - `document_keyword_analysis` - LLM:n tuottamat avainsanat dokumenteille
+- `scheduled_tasks` - päivittäisen keruun ja viikkoraportin ajotila
 
 `documents.source_url` on uniikki, joten samaa alkuperäistä sisältöä ei tallenneta
 useaan kertaan. Jos otsikko, päivämäärä tai sisältö muuttuu, rivi päivitetään.
