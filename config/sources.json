@@ -36,10 +36,10 @@
       "fetch_content": true
     },
     {
-      "name": "Google News - recruiting AI discussions",
+      "name": "Google News - recruiting discussions",
       "type": "feed",
       "url": "https://news.google.com/rss/search?q=%28recruiting%20OR%20%22talent%20acquisition%22%29%20AI&hl=en-US&gl=US&ceid=US:en",
-      "tags": ["news", "ai", "recruiting"],
+      "tags": ["news", "recruiting"],
       "fetch_content": true
     },
     {
