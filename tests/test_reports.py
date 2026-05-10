@@ -57,6 +57,71 @@ class WeeklyKeywordReportTests(unittest.TestCase):
         self.assertEqual(rows[0].occurrence_links[0].source_name, "Example")
         self.assertEqual(rows[1].count, 1)
 
+    def test_report_excludes_default_generic_recruitment_keywords(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+            with DocumentStore(database) as store:
+                store.initialize()
+                store.upsert_item(
+                    CollectedItem(
+                        source_name="Example",
+                        title="Recruiting trend report",
+                        publication_date=None,
+                        content="Content",
+                        source_url="https://example.com/generic",
+                    )
+                )
+                document = store.documents_for_keyword_analysis(force=True)[0]
+                store.save_keyword_analysis(
+                    KeywordAnalysis(
+                        document_id=document.id,
+                        keywords=("rekrytointi", "talent acquisition", "recruiting", "recruitment", "skills"),
+                        model="test-model",
+                        prompt_version="test-v1",
+                        content_hash=document.content_hash,
+                    )
+                )
+
+            rows = build_weekly_keyword_report(
+                database_path=str(database),
+                now=datetime.now(timezone.utc),
+            )
+
+        self.assertEqual([row.keyword for row in rows], ["skills"])
+
+    def test_report_can_disable_default_keyword_blocklist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+            with DocumentStore(database) as store:
+                store.initialize()
+                store.upsert_item(
+                    CollectedItem(
+                        source_name="Example",
+                        title="Recruiting trend report",
+                        publication_date=None,
+                        content="Content",
+                        source_url="https://example.com/generic",
+                    )
+                )
+                document = store.documents_for_keyword_analysis(force=True)[0]
+                store.save_keyword_analysis(
+                    KeywordAnalysis(
+                        document_id=document.id,
+                        keywords=("recruiting", "skills"),
+                        model="test-model",
+                        prompt_version="test-v1",
+                        content_hash=document.content_hash,
+                    )
+                )
+
+            rows = build_weekly_keyword_report(
+                database_path=str(database),
+                now=datetime.now(timezone.utc),
+                blocked_keywords=(),
+            )
+
+        self.assertEqual({row.keyword for row in rows}, {"recruiting", "skills"})
+
     def test_report_formats_empty_table(self) -> None:
         table = format_keyword_report_table([])
 

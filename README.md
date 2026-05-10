@@ -114,6 +114,15 @@ Raportin asetuksia voi säätää:
 - `--top 10` - tulostettavien avainsanojen määrä
 - `--links 3` - esimerkkilinkkien määrä per avainsana
 - `--format html` - tulostaa HTML-taulukon sähköpostikäyttöön
+- `--blocked-keyword KEYWORD` - lisää raportista pois jätettävä avainsana
+- `--no-default-blocked-keywords` - poistaa oletusblokkilistan käytöstä
+
+Oletuksena raportista jätetään pois geneeriset rekrytointitermit:
+
+- `rekrytointi`
+- `talent acquisition`
+- `recruiting`
+- `recruitment`
 
 ## GitHub Actions -sähköpostiraportti
 

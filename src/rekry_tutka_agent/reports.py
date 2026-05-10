@@ -10,6 +10,13 @@ from urllib.parse import quote
 from .db import DocumentStore
 from .models import KeywordReportLink, KeywordReportRow
 
+DEFAULT_BLOCKED_KEYWORDS = (
+    "rekrytointi",
+    "talent acquisition",
+    "recruiting",
+    "recruitment",
+)
+
 
 @dataclass(frozen=True)
 class KeywordOccurrence:
@@ -26,6 +33,7 @@ def build_weekly_keyword_report(
     days: int = 7,
     top_n: int = 10,
     links_per_keyword: int = 3,
+    blocked_keywords: tuple[str, ...] = DEFAULT_BLOCKED_KEYWORDS,
     now: datetime | None = None,
 ) -> list[KeywordReportRow]:
     current_time = now or datetime.now(timezone.utc)
@@ -39,9 +47,13 @@ def build_weekly_keyword_report(
 
     counts: Counter[str] = Counter()
     occurrences: dict[str, list[KeywordOccurrence]] = defaultdict(list)
+    blocked = {_normalize_keyword(keyword) for keyword in blocked_keywords}
     for row in rows:
         keywords = _load_keywords(row["keywords_json"])
         for keyword in keywords:
+            if keyword in blocked:
+                continue
+
             counts[keyword] += 1
             occurrences[keyword].append(
                 KeywordOccurrence(
@@ -145,7 +157,7 @@ def _load_keywords(value: str) -> list[str]:
     keywords: list[str] = []
     seen: set[str] = set()
     for item in payload:
-        keyword = str(item).strip().lower()
+        keyword = _normalize_keyword(str(item))
         if not keyword or keyword in seen:
             continue
 
@@ -153,6 +165,10 @@ def _load_keywords(value: str) -> list[str]:
         keywords.append(keyword)
 
     return keywords
+
+
+def _normalize_keyword(value: str) -> str:
+    return " ".join(value.strip().lower().split())
 
 
 def _format_markdown_link(link: KeywordReportLink) -> str:
