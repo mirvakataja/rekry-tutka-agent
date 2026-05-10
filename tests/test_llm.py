@@ -7,8 +7,16 @@ import tempfile
 import unittest
 
 from rekry_tutka_agent.db import DocumentStore
-from rekry_tutka_agent.llm import KeywordAnalyzer, analyze_stored_documents, extract_keywords, sanitize_keywords
-from rekry_tutka_agent.models import CollectedItem, StoredDocument
+from rekry_tutka_agent.llm import (
+    KeywordAnalyzer,
+    analyze_stored_documents,
+    extract_keywords,
+    extract_trends,
+    sanitize_keywords,
+    sanitize_trends,
+    summarize_weekly_trends,
+)
+from rekry_tutka_agent.models import CollectedItem, KeywordAnalysis, StoredDocument
 
 
 class FakeChatModel:
@@ -30,6 +38,12 @@ class KeywordAnalyzerTests(unittest.TestCase):
             ["AI sourcing", "Candidate experience"],
         )
 
+    def test_extract_trends_accepts_object_payload(self) -> None:
+        self.assertEqual(
+            extract_trends('{"trends": ["Skills-based hiring grows", "AI sourcing matures"]}'),
+            ["Skills-based hiring grows", "AI sourcing matures"],
+        )
+
     def test_sanitize_keywords_deduplicates_and_limits_to_five(self) -> None:
         keywords = sanitize_keywords(
             [" AI sourcing ", "ai sourcing", "Candidate Experience", "Skills", "DEI", "Analytics"],
@@ -37,6 +51,17 @@ class KeywordAnalyzerTests(unittest.TestCase):
         )
 
         self.assertEqual(keywords, ["ai sourcing", "candidate experience", "skills", "dei", "analytics"])
+
+    def test_sanitize_trends_deduplicates_and_limits_to_five(self) -> None:
+        trends = sanitize_trends(
+            [" AI sourcing matures ", "AI sourcing matures", "Skills signals rise", "Analytics", "DEI", "Internal mobility"],
+            max_bullets=5,
+        )
+
+        self.assertEqual(
+            trends,
+            ["AI sourcing matures", "Skills signals rise", "Analytics", "DEI", "Internal mobility"],
+        )
 
     def test_keyword_analyzer_returns_keyword_analysis(self) -> None:
         analyzer = KeywordAnalyzer(FakeChatModel('{"keywords": ["AI sourcing", "Skills-based hiring"]}'))
@@ -86,6 +111,42 @@ class KeywordAnalyzerTests(unittest.TestCase):
 
         self.assertEqual(json.loads(row[0]), ["automation", "candidate experience"])
         self.assertEqual(row[1], "fake-model")
+
+    def test_summarize_weekly_trends_uses_keyword_report_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+            with DocumentStore(database) as store:
+                store.initialize()
+                store.upsert_item(
+                    CollectedItem(
+                        source_name="Example",
+                        title="Skills-based hiring report",
+                        publication_date=None,
+                        content="Skills content",
+                        source_url="https://example.com/skills",
+                    )
+                )
+                document = store.documents_for_keyword_analysis(force=True)[0]
+                store.save_keyword_analysis(
+                    KeywordAnalysis(
+                        document_id=document.id,
+                        keywords=("skills-based hiring", "workforce analytics"),
+                        model="test-model",
+                        prompt_version="test-v1",
+                        content_hash=document.content_hash,
+                    )
+                )
+            chat_model = FakeChatModel(
+                '{"trends": ["Osaamispohjainen rekrytointi korostuu.", "Analytiikka ohjaa rekrytointia."]}'
+            )
+
+            trends = summarize_weekly_trends(database_path=str(database), chat_model=chat_model)
+
+        self.assertEqual(
+            trends,
+            ("Osaamispohjainen rekrytointi korostuu.", "Analytiikka ohjaa rekrytointia."),
+        )
+        self.assertIn("skills-based hiring", chat_model.messages[0][1]["content"])
 
 
 if __name__ == "__main__":

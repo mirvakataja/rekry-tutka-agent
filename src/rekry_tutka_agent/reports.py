@@ -32,7 +32,7 @@ def build_weekly_keyword_report(
     database_path: str,
     days: int = 7,
     top_n: int = 10,
-    links_per_keyword: int = 3,
+    links_per_keyword: int = 5,
     blocked_keywords: tuple[str, ...] = DEFAULT_BLOCKED_KEYWORDS,
     now: datetime | None = None,
 ) -> list[KeywordReportRow]:
@@ -96,6 +96,31 @@ def format_keyword_report_table(rows: list[KeywordReportRow]) -> str:
 
 
 def format_keyword_report_html(rows: list[KeywordReportRow]) -> str:
+    return "\n".join(
+        [
+            "<!doctype html>",
+            "<html>",
+            "<head>",
+            '  <meta charset="utf-8">',
+            "  <style>",
+            "    body { font-family: Arial, sans-serif; color: #1f2933; }",
+            "    table { border-collapse: collapse; width: 100%; }",
+            "    th, td { border: 1px solid #d9e2ec; padding: 8px 10px; vertical-align: top; }",
+            "    th { background: #f0f4f8; text-align: left; }",
+            "    ul { margin: 0; padding-left: 18px; }",
+            "    a { color: #0b5fff; text-decoration: none; }",
+            "    a:hover { text-decoration: underline; }",
+            "  </style>",
+            "</head>",
+            "<body>",
+            format_keyword_report_html_fragment(rows),
+            "</body>",
+            "</html>",
+        ]
+    )
+
+
+def format_keyword_report_html_fragment(rows: list[KeywordReportRow]) -> str:
     table_rows = []
     if rows:
         for row in rows:
@@ -115,21 +140,7 @@ def format_keyword_report_html(rows: list[KeywordReportRow]) -> str:
 
     return "\n".join(
         [
-            "<!doctype html>",
-            "<html>",
-            "<head>",
-            '  <meta charset="utf-8">',
-            "  <style>",
-            "    body { font-family: Arial, sans-serif; color: #1f2933; }",
-            "    table { border-collapse: collapse; width: 100%; }",
-            "    th, td { border: 1px solid #d9e2ec; padding: 8px 10px; vertical-align: top; }",
-            "    th { background: #f0f4f8; text-align: left; }",
-            "    ul { margin: 0; padding-left: 18px; }",
-            "    a { color: #0b5fff; text-decoration: none; }",
-            "    a:hover { text-decoration: underline; }",
-            "  </style>",
-            "</head>",
-            "<body>",
+            "<section>",
             "  <h2>Rekry-tutka: viikon top 10 avainsanat</h2>",
             "  <table>",
             "    <thead>",
@@ -139,8 +150,29 @@ def format_keyword_report_html(rows: list[KeywordReportRow]) -> str:
             *[f"      {row}" for row in table_rows],
             "    </tbody>",
             "  </table>",
-            "</body>",
-            "</html>",
+            "</section>",
+        ]
+    )
+
+
+def format_trend_summary_table(trends: tuple[str, ...] | list[str]) -> str:
+    if not trends:
+        return "Ei trendikoostetta."
+
+    return "\n".join(f"- {trend}" for trend in trends)
+
+
+def format_trend_summary_html(trends: tuple[str, ...] | list[str]) -> str:
+    items = "".join(f"<li>{escape(trend)}</li>" for trend in trends)
+    if not items:
+        items = "<li>Ei trendikoostetta.</li>"
+
+    return "\n".join(
+        [
+            "<section>",
+            "  <h2>Nousevat talent acquisition -trendit</h2>",
+            f"  <ul>{items}</ul>",
+            "</section>",
         ]
     )
 

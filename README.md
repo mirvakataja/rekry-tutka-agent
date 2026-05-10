@@ -138,7 +138,7 @@ Raportin asetuksia voi säätää:
 
 - `--days 7` - tarkasteluikkuna päivinä
 - `--top 10` - tulostettavien avainsanojen määrä
-- `--links 3` - esimerkkilinkkien määrä per avainsana
+- `--links 5` - esimerkkilinkkien määrä per avainsana
 - `--format html` - tulostaa HTML-taulukon sähköpostikäyttöön
 - `--blocked-keyword KEYWORD` - lisää raportista pois jätettävä avainsana
 - `--no-default-blocked-keywords` - poistaa oletusblokkilistan käytöstä
@@ -150,6 +150,14 @@ Oletuksena raportista jätetään pois geneeriset rekrytointitermit:
 - `recruiting`
 - `recruitment`
 
+Trendikoosteen voi pyytää LLM:ltä erikseen:
+
+```bash
+PYTHONPATH=src python3 -m rekry_tutka_agent weekly-trend-summary \
+  --database data/rekry_tutka.db \
+  --bullets 5
+```
+
 ## GitHub Actions -sähköpostiraportti
 
 Repo sisältää workflow'n `.github/workflows/weekly-keyword-report.yml`, joka:
@@ -157,6 +165,7 @@ Repo sisältää workflow'n `.github/workflows/weekly-keyword-report.yml`, joka:
 - ajaa artikkelien ja keskustelujen keruun päivittäin
 - säilyttää SQLite-tietokannan GitHub Actions -cachella ajojen välillä
 - ajaa sunnuntaisin LLM-avainsana-analyysin uusille tai muuttuneille dokumenteille
+- pyytää LLM:ltä viisi bullet pointia nousevista talent acquisition -trendeistä
 - muodostaa viikoittaisen top10-avainsanataulukon HTML-muodossa
 - lähettää taulukon sähköpostiin `mirva.kataja@me.com`
 - näyttää esimerkkiesiintymät klikattavina otsikko/lähde-linkkeinä ilman näkyviä

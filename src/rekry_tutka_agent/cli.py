@@ -10,8 +10,16 @@ from pathlib import Path
 from .agent import TalentAcquisitionAgent
 from .config import load_sources
 from .db import DocumentStore
-from .llm import LLMError, OpenAICompatibleChatModel, analyze_stored_documents
-from .reports import DEFAULT_BLOCKED_KEYWORDS, build_weekly_keyword_report, format_keyword_report_html, format_keyword_report_table
+from .llm import LLMError, OpenAICompatibleChatModel, analyze_stored_documents, summarize_weekly_trends
+from .reports import (
+    DEFAULT_BLOCKED_KEYWORDS,
+    build_weekly_keyword_report,
+    format_keyword_report_html,
+    format_keyword_report_html_fragment,
+    format_keyword_report_table,
+    format_trend_summary_html,
+    format_trend_summary_table,
+)
 from .scheduler import run_scheduler_loop
 
 DEFAULT_DATABASE = Path("data/rekry_tutka.db")
@@ -112,8 +120,38 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.format == "html":
             print(format_keyword_report_html(rows))
+        elif args.format == "html-fragment":
+            print(format_keyword_report_html_fragment(rows))
         else:
             print(format_keyword_report_table(rows))
+        return 0
+
+    if args.command == "weekly-trend-summary":
+        if args.days < 1:
+            parser.error("--days must be at least 1")
+        if args.bullets < 1:
+            parser.error("--bullets must be at least 1")
+
+        try:
+            chat_model = OpenAICompatibleChatModel.from_environment(
+                model=args.model,
+                base_url=args.base_url,
+                api_key_env=args.api_key_env,
+            )
+            trends = summarize_weekly_trends(
+                database_path=str(args.database),
+                chat_model=chat_model,
+                days=args.days,
+                max_bullets=args.bullets,
+                output_language=args.output_language,
+            )
+        except LLMError as exc:
+            parser.exit(1, f"rekry-tutka-agent: weekly trend summary failed: {exc}\n")
+
+        if args.format == "html":
+            print(format_trend_summary_html(trends))
+        else:
+            print(format_trend_summary_table(trends))
         return 0
 
     if args.command == "schedule":
@@ -246,7 +284,7 @@ def _build_parser() -> argparse.ArgumentParser:
     report.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="SQLite database path.")
     report.add_argument("--days", type=int, default=7, help="Window size in days.")
     report.add_argument("--top", type=int, default=10, help="Number of top keywords to print.")
-    report.add_argument("--links", type=int, default=3, help="Number of occurrence links per keyword.")
+    report.add_argument("--links", type=int, default=5, help="Number of occurrence links per keyword.")
     report.add_argument(
         "--blocked-keyword",
         action="append",
@@ -263,9 +301,43 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     report.add_argument(
         "--format",
-        choices=("markdown", "html"),
+        choices=("markdown", "html", "html-fragment"),
         default="markdown",
         help="Output format for the report.",
+    )
+
+    trend_summary = subparsers.add_parser(
+        "weekly-trend-summary",
+        help="Use an LLM to summarize emerging weekly talent acquisition trends.",
+    )
+    trend_summary.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="SQLite database path.")
+    trend_summary.add_argument("--days", type=int, default=7, help="Window size in days.")
+    trend_summary.add_argument("--bullets", type=int, default=5, help="Number of trend bullet points to print.")
+    trend_summary.add_argument(
+        "--output-language",
+        default="Finnish",
+        help="Preferred language for the trend summary.",
+    )
+    trend_summary.add_argument(
+        "--format",
+        choices=("markdown", "html"),
+        default="markdown",
+        help="Output format for the trend summary.",
+    )
+    trend_summary.add_argument(
+        "--model",
+        default=None,
+        help="LLM model name. Defaults to REKRY_TUTKA_LLM_MODEL or gpt-4o-mini.",
+    )
+    trend_summary.add_argument(
+        "--base-url",
+        default=None,
+        help="OpenAI-compatible API base URL. Defaults to OPENAI_BASE_URL or https://api.openai.com/v1.",
+    )
+    trend_summary.add_argument(
+        "--api-key-env",
+        default="OPENAI_API_KEY",
+        help="Environment variable that contains the LLM API key.",
     )
 
     schedule = subparsers.add_parser(
