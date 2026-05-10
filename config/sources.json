@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "name": "Google News - talent acquisition trends",
+      "type": "feed",
+      "url": "https://news.google.com/rss/search?q=%22talent%20acquisition%22%20trends&hl=en-US&gl=US&ceid=US:en",
+      "tags": ["news", "trends", "talent-acquisition"],
+      "fetch_content": true
+    },
+    {
+      "name": "Google News - recruiting AI discussions",
+      "type": "feed",
+      "url": "https://news.google.com/rss/search?q=%28recruiting%20OR%20%22talent%20acquisition%22%29%20AI&hl=en-US&gl=US&ceid=US:en",
+      "tags": ["news", "ai", "recruiting"],
+      "fetch_content": true
+    },
+    {
+      "name": "Reddit search - recruiting discussions",
+      "type": "feed",
+      "url": "https://www.reddit.com/search.rss?q=%22talent%20acquisition%22%20recruiting&sort=new",
+      "tags": ["discussion", "recruiting"],
+      "fetch_content": false
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+[project]
+name = "rekry-tutka-agent"
+version = "0.1.0"
+description = "Agent for collecting talent acquisition trends and discussions from web sources."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+rekry-tutka-agent = "rekry_tutka_agent.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

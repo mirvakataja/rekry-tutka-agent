@@ -1,0 +1,3 @@
+"""Talent acquisition trend collection agent."""
+
+__version__ = "0.1.0"
