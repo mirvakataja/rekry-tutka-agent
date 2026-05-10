@@ -1,0 +1,139 @@
+name: Talent acquisition weekly keyword report
+
+on:
+  schedule:
+    # Daily ingestion runs every morning UTC. The report/email steps run on Sundays.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      send_email:
+        description: "Send the weekly keyword report email"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      ingestion_limit:
+        description: "Maximum feed items to process per source"
+        required: false
+        default: "50"
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_PATH: data/rekry_tutka.db
+  SOURCES_PATH: config/sources.json
+  REPORT_PATH: reports/weekly-keyword-report.md
+  REPORT_RECIPIENT: mirva.kataja@me.com
+  INGESTION_LIMIT: ${{ github.event.inputs.ingestion_limit || '50' }}
+  REKRY_TUTKA_LLM_MODEL: ${{ vars.REKRY_TUTKA_LLM_MODEL || 'gpt-4o-mini' }}
+  OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL || 'https://api.openai.com/v1' }}
+
+jobs:
+  collect-and-report:
+    name: Collect articles and email weekly keyword report
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Prepare runtime directories
+        run: mkdir -p data reports
+
+      - name: Restore persisted SQLite database
+        uses: actions/cache/restore@v4
+        with:
+          path: data/rekry_tutka.db
+          key: rekry-tutka-db-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            rekry-tutka-db-
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Initialize database
+        run: python -m rekry_tutka_agent init-db --database "$DATABASE_PATH"
+
+      - name: Collect latest articles and discussions
+        run: |
+          python -m rekry_tutka_agent run \
+            --sources "$SOURCES_PATH" \
+            --database "$DATABASE_PATH" \
+            --limit "$INGESTION_LIMIT"
+
+      - name: Decide whether to send report
+        id: report_schedule
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "send_email=${{ github.event.inputs.send_email }}" >> "$GITHUB_OUTPUT"
+          elif [[ "$(date -u +%u)" == "7" ]]; then
+            echo "send_email=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "send_email=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate weekly report secrets
+        if: steps.report_schedule.outputs.send_email == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: |
+          test -n "$OPENAI_API_KEY" || (echo "OPENAI_API_KEY secret is required" >&2; exit 1)
+          test -n "$SMTP_SERVER" || (echo "SMTP_SERVER secret is required" >&2; exit 1)
+          test -n "$SMTP_PORT" || (echo "SMTP_PORT secret is required" >&2; exit 1)
+          test -n "$SMTP_USERNAME" || (echo "SMTP_USERNAME secret is required" >&2; exit 1)
+          test -n "$SMTP_PASSWORD" || (echo "SMTP_PASSWORD secret is required" >&2; exit 1)
+
+      - name: Analyze stored documents with LLM
+        if: steps.report_schedule.outputs.send_email == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python -m rekry_tutka_agent analyze-keywords \
+            --database "$DATABASE_PATH" \
+            --max-keywords 5 \
+            --output-language Finnish
+
+      - name: Build weekly keyword report
+        if: steps.report_schedule.outputs.send_email == 'true'
+        run: |
+          mkdir -p "$(dirname "$REPORT_PATH")"
+          python -m rekry_tutka_agent weekly-keyword-report \
+            --database "$DATABASE_PATH" \
+            --days 7 \
+            --top 10 \
+            --links 3 > "$REPORT_PATH"
+          cat "$REPORT_PATH"
+
+      - name: Email weekly keyword report
+        if: steps.report_schedule.outputs.send_email == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "Rekry-tutka: viikon avainsanaraportti"
+          to: ${{ env.REPORT_RECIPIENT }}
+          from: ${{ secrets.SMTP_FROM || secrets.SMTP_USERNAME }}
+          body: file://${{ env.REPORT_PATH }}
+
+      - name: Save updated SQLite database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/rekry_tutka.db
+          key: rekry-tutka-db-${{ github.run_id }}-${{ github.run_attempt }}
