@@ -10,6 +10,8 @@ from .agent import TalentAcquisitionAgent
 from .config import load_sources
 from .db import DocumentStore
 from .llm import LLMError, OpenAICompatibleChatModel, analyze_stored_documents
+from .reports import build_weekly_keyword_report, format_keyword_report_table
+from .scheduler import run_scheduler_loop
 
 DEFAULT_DATABASE = Path("data/rekry_tutka.db")
 DEFAULT_SOURCES = Path("config/sources.json")
@@ -62,6 +64,58 @@ def main(argv: list[str] | None = None) -> int:
             )
         except LLMError as exc:
             parser.exit(1, f"rekry-tutka-agent: LLM analysis failed: {exc}\n")
+
+        print(json.dumps(asdict(result), indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "weekly-keyword-report":
+        if args.days < 1:
+            parser.error("--days must be at least 1")
+        if args.top < 1:
+            parser.error("--top must be at least 1")
+        if args.links < 1:
+            parser.error("--links must be at least 1")
+
+        rows = build_weekly_keyword_report(
+            database_path=str(args.database),
+            days=args.days,
+            top_n=args.top,
+            links_per_keyword=args.links,
+        )
+        print(format_keyword_report_table(rows))
+        return 0
+
+    if args.command == "schedule":
+        if args.max_keywords < 1 or args.max_keywords > 5:
+            parser.error("--max-keywords must be between 1 and 5")
+        if args.ingestion_interval_hours < 1:
+            parser.error("--ingestion-interval-hours must be at least 1")
+        if args.weekly_interval_days < 1:
+            parser.error("--weekly-interval-days must be at least 1")
+        if args.check_interval_seconds < 1:
+            parser.error("--check-interval-seconds must be at least 1")
+
+        try:
+            result = run_scheduler_loop(
+                database_path=str(args.database),
+                sources_path=str(args.sources),
+                ingestion_interval_hours=args.ingestion_interval_hours,
+                weekly_interval_days=args.weekly_interval_days,
+                check_interval_seconds=args.check_interval_seconds,
+                once=args.once,
+                ingestion_limit=args.limit,
+                fetch_linked_content=not args.no_fetch_linked_content,
+                chat_model_factory=lambda: OpenAICompatibleChatModel.from_environment(
+                    model=args.model,
+                    base_url=args.base_url,
+                    api_key_env=args.api_key_env,
+                ),
+                max_keywords=args.max_keywords,
+                content_char_limit=args.content_chars,
+                output_language=args.output_language,
+            )
+        except LLMError as exc:
+            parser.exit(1, f"rekry-tutka-agent: scheduled LLM analysis failed: {exc}\n")
 
         print(json.dumps(asdict(result), indent=2, sort_keys=True))
         return 0
@@ -132,6 +186,79 @@ def _build_parser() -> argparse.ArgumentParser:
         help="OpenAI-compatible API base URL. Defaults to OPENAI_BASE_URL or https://api.openai.com/v1.",
     )
     analyze.add_argument(
+        "--api-key-env",
+        default="OPENAI_API_KEY",
+        help="Environment variable that contains the LLM API key.",
+    )
+
+    report = subparsers.add_parser(
+        "weekly-keyword-report",
+        help="Print a top keyword table for documents discovered during the last week.",
+    )
+    report.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="SQLite database path.")
+    report.add_argument("--days", type=int, default=7, help="Window size in days.")
+    report.add_argument("--top", type=int, default=10, help="Number of top keywords to print.")
+    report.add_argument("--links", type=int, default=3, help="Number of occurrence links per keyword.")
+
+    schedule = subparsers.add_parser(
+        "schedule",
+        help="Run due daily ingestion and weekly keyword analysis/report tasks.",
+    )
+    schedule.add_argument("--sources", type=Path, default=DEFAULT_SOURCES, help="JSON file containing web sources.")
+    schedule.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="SQLite database path.")
+    schedule.add_argument("--limit", type=int, default=None, help="Maximum feed items to process per source.")
+    schedule.add_argument(
+        "--no-fetch-linked-content",
+        action="store_true",
+        help="Store feed content only instead of fetching each original link.",
+    )
+    schedule.add_argument(
+        "--ingestion-interval-hours",
+        type=int,
+        default=24,
+        help="Minimum interval between ingestion runs.",
+    )
+    schedule.add_argument(
+        "--weekly-interval-days",
+        type=int,
+        default=7,
+        help="Minimum interval between keyword report runs.",
+    )
+    schedule.add_argument(
+        "--check-interval-seconds",
+        type=int,
+        default=3600,
+        help="How often the scheduler checks for due tasks.",
+    )
+    schedule.add_argument("--once", action="store_true", help="Run due tasks once and exit.")
+    schedule.add_argument(
+        "--max-keywords",
+        type=int,
+        default=5,
+        help="Maximum number of keywords to store per document. Must be between 1 and 5.",
+    )
+    schedule.add_argument(
+        "--content-chars",
+        type=int,
+        default=8_000,
+        help="Maximum number of content characters sent to the LLM per document.",
+    )
+    schedule.add_argument(
+        "--output-language",
+        default="Finnish",
+        help="Preferred keyword language for the LLM response.",
+    )
+    schedule.add_argument(
+        "--model",
+        default=None,
+        help="LLM model name. Defaults to REKRY_TUTKA_LLM_MODEL or gpt-4o-mini.",
+    )
+    schedule.add_argument(
+        "--base-url",
+        default=None,
+        help="OpenAI-compatible API base URL. Defaults to OPENAI_BASE_URL or https://api.openai.com/v1.",
+    )
+    schedule.add_argument(
         "--api-key-env",
         default="OPENAI_API_KEY",
         help="Environment variable that contains the LLM API key.",

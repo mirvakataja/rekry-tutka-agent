@@ -74,6 +74,13 @@ class DocumentStore:
                 analyzed_at TEXT NOT NULL,
                 FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS scheduled_tasks (
+                name TEXT PRIMARY KEY,
+                last_started_at TEXT,
+                last_finished_at TEXT,
+                last_status TEXT NOT NULL DEFAULT 'never'
+            );
             """
         )
         self.connection.commit()
@@ -85,6 +92,58 @@ class DocumentStore:
             VALUES (?, ?, 'running', ?)
             """,
             (run_id, _utc_now(), sources_checked),
+        )
+        self.connection.commit()
+
+    def keyword_analysis_rows_since(self, since_iso: str) -> list[sqlite3.Row]:
+        return self.connection.execute(
+            """
+            SELECT
+                documents.id AS document_id,
+                documents.title,
+                documents.source_url,
+                documents.discovered_at,
+                analysis.keywords_json
+            FROM document_keyword_analysis AS analysis
+            JOIN documents ON documents.id = analysis.document_id
+            WHERE documents.discovered_at >= ?
+            ORDER BY documents.discovered_at DESC, documents.id DESC
+            """,
+            (since_iso,),
+        ).fetchall()
+
+    def task_last_finished_at(self, name: str) -> str | None:
+        row = self.connection.execute(
+            "SELECT last_finished_at FROM scheduled_tasks WHERE name = ?",
+            (name,),
+        ).fetchone()
+        if row is None:
+            return None
+        return row["last_finished_at"]
+
+    def mark_task_started(self, name: str) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO scheduled_tasks (name, last_started_at, last_status)
+            VALUES (?, ?, 'running')
+            ON CONFLICT(name) DO UPDATE SET
+                last_started_at = excluded.last_started_at,
+                last_status = excluded.last_status
+            """,
+            (name, _utc_now()),
+        )
+        self.connection.commit()
+
+    def mark_task_finished(self, name: str, status: str) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO scheduled_tasks (name, last_finished_at, last_status)
+            VALUES (?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+                last_finished_at = excluded.last_finished_at,
+                last_status = excluded.last_status
+            """,
+            (name, _utc_now(), status),
         )
         self.connection.commit()
 

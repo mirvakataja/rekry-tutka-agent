@@ -71,3 +71,12 @@ class KeywordAnalysisResult:
     analyzed_count: int
     skipped_count: int
     error_count: int
+
+
+@dataclass(frozen=True)
+class KeywordReportRow:
+    """One row in a weekly keyword trend report."""
+
+    keyword: str
+    count: int
+    occurrence_links: tuple[str, ...]
