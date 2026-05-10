@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from rekry_tutka_agent.date_utils import normalize_date
+from rekry_tutka_agent.date_utils import normalize_date, parse_date
 
 
 class NormalizeDateTests(unittest.TestCase):
@@ -18,6 +18,11 @@ class NormalizeDateTests(unittest.TestCase):
     def test_empty_values_return_none(self) -> None:
         self.assertIsNone(normalize_date(None))
         self.assertIsNone(normalize_date("   "))
+
+    def test_parse_date_returns_utc_datetime(self) -> None:
+        parsed = parse_date("2026-05-10T01:00:00+03:00")
+
+        self.assertEqual(parsed.isoformat(), "2026-05-09T22:00:00+00:00")
 
 
 if __name__ == "__main__":

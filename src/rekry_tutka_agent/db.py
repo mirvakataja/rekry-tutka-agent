@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 from typing import Literal
 
+from .date_utils import parse_date
 from .models import CollectedItem, KeywordAnalysis, StoredDocument
 
 UpsertStatus = Literal["inserted", "updated", "unchanged"]
@@ -330,6 +331,37 @@ class DocumentStore:
             ),
         )
         self.connection.commit()
+
+    def delete_documents_published_before(self, cutoff: datetime) -> int:
+        """Delete documents with a parseable publication date before the cutoff."""
+
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.replace(tzinfo=timezone.utc)
+        cutoff = cutoff.astimezone(timezone.utc)
+
+        rows = self.connection.execute(
+            "SELECT id, publication_date FROM documents WHERE publication_date IS NOT NULL"
+        ).fetchall()
+        document_ids = [
+            row["id"]
+            for row in rows
+            if (publication_date := parse_date(row["publication_date"])) is not None and publication_date < cutoff
+        ]
+
+        if not document_ids:
+            return 0
+
+        placeholders = ",".join("?" for _ in document_ids)
+        self.connection.execute(
+            f"DELETE FROM document_keyword_analysis WHERE document_id IN ({placeholders})",
+            document_ids,
+        )
+        self.connection.execute(
+            f"DELETE FROM documents WHERE id IN ({placeholders})",
+            document_ids,
+        )
+        self.connection.commit()
+        return len(document_ids)
 
 
 def _content_hash(item: CollectedItem) -> str:

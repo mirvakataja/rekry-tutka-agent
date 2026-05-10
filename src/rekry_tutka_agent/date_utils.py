@@ -24,7 +24,7 @@ def normalize_date(value: str | None) -> str | None:
     if not normalized:
         return None
 
-    parsed = _parse_date(normalized)
+    parsed = parse_date(normalized)
     if parsed is None:
         return normalized
 
@@ -34,21 +34,39 @@ def normalize_date(value: str | None) -> str | None:
     return parsed.astimezone(timezone.utc).isoformat()
 
 
-def _parse_date(value: str) -> datetime | None:
+def parse_date(value: str | None) -> datetime | None:
+    """Parse a date-like string and return a timezone-aware UTC datetime."""
+
+    if not value:
+        return None
+
+    normalized = value.strip()
+    if not normalized:
+        return None
+
     try:
-        return parsedate_to_datetime(value)
+        parsed = parsedate_to_datetime(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
     except (TypeError, ValueError, IndexError):
         pass
 
-    iso_value = value.replace("Z", "+00:00")
+    iso_value = normalized.replace("Z", "+00:00")
     try:
-        return datetime.fromisoformat(iso_value)
+        parsed = datetime.fromisoformat(iso_value)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
     except ValueError:
         pass
 
     for date_format in COMMON_DATE_FORMATS:
         try:
-            return datetime.strptime(value, date_format)
+            parsed = datetime.strptime(normalized, date_format)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
         except ValueError:
             continue
 

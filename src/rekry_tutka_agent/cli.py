@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .agent import TalentAcquisitionAgent
@@ -32,15 +33,37 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "run":
+        if args.max_article_age_days is not None and args.max_article_age_days < 1:
+            parser.error("--max-article-age-days must be at least 1")
+
         sources = load_sources(args.sources)
         agent = TalentAcquisitionAgent(
             sources=sources,
             database_path=args.database,
             max_items_per_source=args.limit,
             fetch_linked_content=not args.no_fetch_linked_content,
+            max_article_age_days=args.max_article_age_days,
         )
         result = agent.run()
         print(json.dumps(asdict(result), indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "cleanup-old-documents":
+        cutoff = _parse_cutoff_date(args.before_date)
+        with DocumentStore(args.database) as store:
+            store.initialize()
+            deleted_count = store.delete_documents_published_before(cutoff)
+        print(
+            json.dumps(
+                {
+                    "database": str(args.database),
+                    "before_date": cutoff.date().isoformat(),
+                    "deleted_count": deleted_count,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 0
 
     if args.command == "analyze-keywords":
@@ -157,6 +180,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-fetch-linked-content",
         action="store_true",
         help="Store feed content only instead of fetching each original link.",
+    )
+    run.add_argument(
+        "--max-article-age-days",
+        type=int,
+        default=365,
+        help="Skip documents with a parseable publication date older than this many days.",
+    )
+
+    cleanup = subparsers.add_parser(
+        "cleanup-old-documents",
+        help="Delete stored documents published before a cutoff date.",
+    )
+    cleanup.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="SQLite database path.")
+    cleanup.add_argument(
+        "--before-date",
+        default="2025-01-01",
+        help="Delete documents with publication dates before this date, in YYYY-MM-DD format.",
     )
 
     analyze = subparsers.add_parser(
@@ -293,6 +333,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _parse_cutoff_date(value: str) -> datetime:
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d")
+    except ValueError as exc:
+        raise SystemExit(f"rekry-tutka-agent: --before-date must use YYYY-MM-DD format: {value}\n") from exc
+    return parsed.replace(tzinfo=timezone.utc)
 
 
 if __name__ == "__main__":
