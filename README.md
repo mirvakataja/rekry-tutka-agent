@@ -158,6 +158,16 @@ PYTHONPATH=src python3 -m rekry_tutka_agent weekly-trend-summary \
   --bullets 5
 ```
 
+Trendikoosteen fokusta voi vaihtaa esimerkiksi tech/IT-alan rekrytointiin:
+
+```bash
+PYTHONPATH=src python3 -m rekry_tutka_agent weekly-trend-summary \
+  --database data/rekry_tutka.db \
+  --focus-area "tech/IT alan rekrytointi" \
+  --title "Tech/IT-alan rekrytoinnin trendit" \
+  --format html
+```
+
 ## GitHub Actions -sähköpostiraportti
 
 Repo sisältää workflow'n `.github/workflows/weekly-keyword-report.yml`, joka:
@@ -166,6 +176,7 @@ Repo sisältää workflow'n `.github/workflows/weekly-keyword-report.yml`, joka:
 - säilyttää SQLite-tietokannan GitHub Actions -cachella ajojen välillä
 - ajaa sunnuntaisin LLM-avainsana-analyysin uusille tai muuttuneille dokumenteille
 - pyytää LLM:ltä viisi bullet pointia nousevista talent acquisition -trendeistä
+- pyytää LLM:ltä toisen viiden bullet pointin koosteen tech/IT-alan rekrytoinnin trendeistä
 - muodostaa viikoittaisen top10-avainsanataulukon HTML-muodossa
 - lähettää taulukon sähköpostiin `mirva.kataja@me.com`
 - näyttää esimerkkiesiintymät klikattavina otsikko/lähde-linkkeinä ilman näkyviä

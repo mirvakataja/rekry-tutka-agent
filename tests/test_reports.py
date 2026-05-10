@@ -183,6 +183,14 @@ class WeeklyKeywordReportTests(unittest.TestCase):
         self.assertIn("<h2>Nousevat talent acquisition -trendit</h2>", html)
         self.assertIn("<li>Osaamispohjainen rekrytointi kasvaa.</li>", html)
 
+    def test_trend_summary_formats_custom_html_title(self) -> None:
+        html = format_trend_summary_html(
+            ("Developer hiring shifts toward skills signals.",),
+            title="Tech/IT-alan rekrytoinnin trendit",
+        )
+
+        self.assertIn("<h2>Tech/IT-alan rekrytoinnin trendit</h2>", html)
+
 
 if __name__ == "__main__":
     unittest.main()

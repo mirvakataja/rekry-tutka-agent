@@ -144,12 +144,13 @@ def main(argv: list[str] | None = None) -> int:
                 days=args.days,
                 max_bullets=args.bullets,
                 output_language=args.output_language,
+                focus_area=args.focus_area,
             )
         except LLMError as exc:
             parser.exit(1, f"rekry-tutka-agent: weekly trend summary failed: {exc}\n")
 
         if args.format == "html":
-            print(format_trend_summary_html(trends))
+            print(format_trend_summary_html(trends, title=args.title))
         else:
             print(format_trend_summary_table(trends))
         return 0
@@ -317,6 +318,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-language",
         default="Finnish",
         help="Preferred language for the trend summary.",
+    )
+    trend_summary.add_argument(
+        "--focus-area",
+        default="talent acquisition",
+        help="Trend focus area for the LLM prompt.",
+    )
+    trend_summary.add_argument(
+        "--title",
+        default="Nousevat talent acquisition -trendit",
+        help="HTML section heading used with --format html.",
     )
     trend_summary.add_argument(
         "--format",

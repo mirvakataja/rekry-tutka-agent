@@ -162,7 +162,11 @@ def format_trend_summary_table(trends: tuple[str, ...] | list[str]) -> str:
     return "\n".join(f"- {trend}" for trend in trends)
 
 
-def format_trend_summary_html(trends: tuple[str, ...] | list[str]) -> str:
+def format_trend_summary_html(
+    trends: tuple[str, ...] | list[str],
+    *,
+    title: str = "Nousevat talent acquisition -trendit",
+) -> str:
     items = "".join(f"<li>{escape(trend)}</li>" for trend in trends)
     if not items:
         items = "<li>Ei trendikoostetta.</li>"
@@ -170,7 +174,7 @@ def format_trend_summary_html(trends: tuple[str, ...] | list[str]) -> str:
     return "\n".join(
         [
             "<section>",
-            "  <h2>Nousevat talent acquisition -trendit</h2>",
+            f"  <h2>{escape(title)}</h2>",
             f"  <ul>{items}</ul>",
             "</section>",
         ]

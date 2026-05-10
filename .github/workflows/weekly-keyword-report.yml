@@ -27,6 +27,7 @@ env:
   SOURCES_PATH: config/sources.json
   REPORT_PATH: reports/weekly-email-report.html
   TREND_SUMMARY_PATH: reports/weekly-trend-summary.html
+  TECH_IT_TREND_SUMMARY_PATH: reports/weekly-tech-it-trend-summary.html
   KEYWORD_TABLE_PATH: reports/weekly-keyword-table.html
   REPORT_RECIPIENT: mirva.kataja@me.com
   INGESTION_LIMIT: ${{ github.event.inputs.ingestion_limit || '50' }}
@@ -120,7 +121,24 @@ jobs:
             --days 7 \
             --bullets 5 \
             --output-language Finnish \
+            --focus-area "talent acquisition" \
+            --title "Nousevat talent acquisition -trendit" \
             --format html > "$TREND_SUMMARY_PATH"
+
+      - name: Build weekly Tech/IT recruiting trend summary
+        if: steps.report_schedule.outputs.send_email == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          mkdir -p reports
+          python -m rekry_tutka_agent weekly-trend-summary \
+            --database "$DATABASE_PATH" \
+            --days 7 \
+            --bullets 5 \
+            --output-language Finnish \
+            --focus-area "tech/IT alan rekrytointi" \
+            --title "Tech/IT-alan rekrytoinnin trendit" \
+            --format html > "$TECH_IT_TREND_SUMMARY_PATH"
 
       - name: Build weekly keyword report
         if: steps.report_schedule.outputs.send_email == 'true'
@@ -152,6 +170,7 @@ jobs:
           <body>
           HTML
             cat "$TREND_SUMMARY_PATH"
+            cat "$TECH_IT_TREND_SUMMARY_PATH"
             cat "$KEYWORD_TABLE_PATH"
             cat <<'HTML'
           </body>
