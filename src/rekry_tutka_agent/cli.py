@@ -9,7 +9,7 @@ from pathlib import Path
 from .agent import TalentAcquisitionAgent
 from .config import load_sources
 from .db import DocumentStore
-from .llm import OpenAICompatibleChatModel, analyze_stored_documents
+from .llm import LLMError, OpenAICompatibleChatModel, analyze_stored_documents
 
 DEFAULT_DATABASE = Path("data/rekry_tutka.db")
 DEFAULT_SOURCES = Path("config/sources.json")
@@ -45,20 +45,24 @@ def main(argv: list[str] | None = None) -> int:
         if args.max_keywords < 1 or args.max_keywords > 5:
             parser.error("--max-keywords must be between 1 and 5")
 
-        chat_model = OpenAICompatibleChatModel.from_environment(
-            model=args.model,
-            base_url=args.base_url,
-            api_key_env=args.api_key_env,
-        )
-        result = analyze_stored_documents(
-            database_path=args.database,
-            chat_model=chat_model,
-            limit=args.limit,
-            force=args.force,
-            max_keywords=args.max_keywords,
-            content_char_limit=args.content_chars,
-            output_language=args.output_language,
-        )
+        try:
+            chat_model = OpenAICompatibleChatModel.from_environment(
+                model=args.model,
+                base_url=args.base_url,
+                api_key_env=args.api_key_env,
+            )
+            result = analyze_stored_documents(
+                database_path=args.database,
+                chat_model=chat_model,
+                limit=args.limit,
+                force=args.force,
+                max_keywords=args.max_keywords,
+                content_char_limit=args.content_chars,
+                output_language=args.output_language,
+            )
+        except LLMError as exc:
+            parser.exit(1, f"rekry-tutka-agent: LLM analysis failed: {exc}\n")
+
         print(json.dumps(asdict(result), indent=2, sort_keys=True))
         return 0
 
