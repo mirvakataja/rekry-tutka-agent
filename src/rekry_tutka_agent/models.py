@@ -74,9 +74,18 @@ class KeywordAnalysisResult:
 
 
 @dataclass(frozen=True)
+class KeywordReportLink:
+    """One linked source example in a keyword trend report."""
+
+    title: str
+    source_url: str
+    source_name: str
+
+
+@dataclass(frozen=True)
 class KeywordReportRow:
     """One row in a weekly keyword trend report."""
 
     keyword: str
     count: int
-    occurrence_links: tuple[str, ...]
+    occurrence_links: tuple[KeywordReportLink, ...]

@@ -113,6 +113,7 @@ Raportin asetuksia voi säätää:
 - `--days 7` - tarkasteluikkuna päivinä
 - `--top 10` - tulostettavien avainsanojen määrä
 - `--links 3` - esimerkkilinkkien määrä per avainsana
+- `--format html` - tulostaa HTML-taulukon sähköpostikäyttöön
 
 ## GitHub Actions -sähköpostiraportti
 
@@ -121,8 +122,10 @@ Repo sisältää workflow'n `.github/workflows/weekly-keyword-report.yml`, joka:
 - ajaa artikkelien ja keskustelujen keruun päivittäin
 - säilyttää SQLite-tietokannan GitHub Actions -cachella ajojen välillä
 - ajaa sunnuntaisin LLM-avainsana-analyysin uusille tai muuttuneille dokumenteille
-- muodostaa viikoittaisen top10-avainsanataulukon
+- muodostaa viikoittaisen top10-avainsanataulukon HTML-muodossa
 - lähettää taulukon sähköpostiin `mirva.kataja@me.com`
+- näyttää esimerkkiesiintymät klikattavina otsikko/lähde-linkkeinä ilman näkyviä
+  tekstimuotoisia URL:eja
 
 Workflow'n voi käynnistää myös käsin GitHubin Actions-näkymästä.
 
