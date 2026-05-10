@@ -204,7 +204,8 @@ useaan kertaan. Jos otsikko, päivämäärä tai sisältö muuttuu, rivi päivit
 Oletuskonfiguraatio sisältää jo Ylen työelämä- ja työnvälityssyötteet sekä
 Duunitorin Työelämä-sivuston yleisen ja rekrytointiaiheisen syötteen. Redditin
 puolelta mukana ovat `r/recruiting`, `r/Recruitment`,
-`r/RecruitmentAnalytics` ja `r/TalentAcquisition`.
+`r/RecruitmentAnalytics` ja `r/TalentAcquisition`. Artikkelilähteissä on mukana
+myös ERE.netin rekrytointikategorian artikkelilista.
 
 Lisää uusi RSS- tai Atom-lähde `config/sources.json`-tiedostoon:
 
@@ -213,6 +214,20 @@ Lisää uusi RSS- tai Atom-lähde `config/sources.json`-tiedostoon:
   "name": "Example source",
   "type": "feed",
   "url": "https://example.com/feed.xml",
+  "tags": ["news", "talent-acquisition"],
+  "fetch_content": true
+}
+```
+
+Jos sivusto ei tarjoa RSS/Atom-syötettä, mutta sillä on artikkelilista, lähteen
+voi määrittää `html_listing`-tyyppisenä:
+
+```json
+{
+  "name": "Example listing",
+  "type": "html_listing",
+  "url": "https://example.com/articles",
+  "link_prefix": "/articles/",
   "tags": ["news", "talent-acquisition"],
   "fetch_content": true
 }

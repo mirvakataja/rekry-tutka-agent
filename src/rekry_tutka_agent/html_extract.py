@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from html import unescape
 from html.parser import HTMLParser
 import re
+from urllib.parse import urldefrag, urljoin, urlparse
 
 from .date_utils import normalize_date
 
@@ -128,10 +129,31 @@ class _ReadableHtmlParser(HTMLParser):
         )
 
 
+class _LinkParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() != "a":
+            return
+
+        for name, value in attrs:
+            if name.lower() == "href" and value:
+                self.hrefs.append(value)
+                return
+
+
 def extract_html(html: str) -> ExtractedHtml:
     parser = _ReadableHtmlParser()
     parser.feed(html)
-    return parser.extracted
+    extracted = parser.extracted
+    publication_date = extracted.publication_date or _extract_json_ld_publication_date(html)
+    return ExtractedHtml(
+        title=extracted.title,
+        content=extracted.content,
+        publication_date=publication_date,
+    )
 
 
 def html_fragment_to_text(fragment: str | None) -> str:
@@ -143,6 +165,24 @@ def html_fragment_to_text(fragment: str | None) -> str:
     return parser.extracted.content
 
 
+def extract_links(html: str, *, base_url: str, path_prefix: str | None = None) -> list[str]:
+    parser = _LinkParser()
+    parser.feed(html)
+
+    links: list[str] = []
+    seen: set[str] = set()
+    for href in parser.hrefs:
+        absolute, _fragment = urldefrag(urljoin(base_url, href))
+        if not _matches_path_prefix(absolute, path_prefix):
+            continue
+
+        if absolute not in seen:
+            seen.add(absolute)
+            links.append(absolute)
+
+    return links
+
+
 def clean_text(value: str | None) -> str:
     if not value:
         return ""
@@ -152,3 +192,19 @@ def clean_text(value: str | None) -> str:
     collapsed = re.sub(r"\n\s*", "\n", collapsed)
     collapsed = re.sub(r"\n{3,}", "\n\n", collapsed)
     return collapsed.strip()
+
+
+def _matches_path_prefix(url: str, path_prefix: str | None) -> bool:
+    if not path_prefix:
+        return True
+
+    parsed = urlparse(url)
+    return parsed.path.startswith(path_prefix)
+
+
+def _extract_json_ld_publication_date(html: str) -> str | None:
+    match = re.search(r'"datePublished"\s*:\s*"([^"]+)"', html)
+    if not match:
+        return None
+
+    return normalize_date(match.group(1))

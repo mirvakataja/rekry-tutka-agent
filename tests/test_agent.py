@@ -140,6 +140,55 @@ class TalentAcquisitionAgentTests(unittest.TestCase):
 
         self.assertEqual(rows, [("Fresh recruiting trend", fresh_article_url)])
 
+    def test_agent_collects_html_listing_sources(self) -> None:
+        listing_url = "https://example.com/category"
+        article_url = "https://example.com/articles/talent-acquisition"
+        listing = f"""
+        <html><body>
+          <a href="/articles/talent-acquisition">Talent acquisition article</a>
+          <a href="/about">About</a>
+        </body></html>
+        """
+        article = """<!doctype html>
+        <html>
+          <head>
+            <title>Talent acquisition article</title>
+            <script type="application/ld+json">
+              {"datePublished":"2026-04-01T12:00:00.000Z"}
+            </script>
+          </head>
+          <body>
+            <article><p>Article content about recruiting operations.</p></article>
+          </body>
+        </html>
+        """
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "agent.db"
+            agent = TalentAcquisitionAgent(
+                sources=[
+                    SourceConfig(
+                        name="HTML Source",
+                        url=listing_url,
+                        type="html_listing",
+                        link_prefix="/articles/",
+                    )
+                ],
+                database_path=database,
+                fetcher=FakeFetcher({listing_url: listing, article_url: article}),
+                now=datetime(2026, 5, 10, tzinfo=timezone.utc),
+            )
+
+            result = agent.run()
+
+            self.assertEqual(result.inserted_count, 1)
+            with sqlite3.connect(database) as connection:
+                row = connection.execute(
+                    "SELECT title, publication_date, source_url FROM documents"
+                ).fetchone()
+
+        self.assertEqual(row, ("Talent acquisition article", "2026-04-01T12:00:00+00:00", article_url))
+
 
 if __name__ == "__main__":
     unittest.main()
